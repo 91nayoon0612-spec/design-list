@@ -866,89 +866,68 @@ if (nums && nums.length >= 2) {
     }
 };
 // --- [데이터 저장/로드 로직 시작] ---
-// [1] 구글 시트 데이터 로드 및 정밀 파싱
+
+// 여기서 부터 아래로 구글시트 내용 불러오는 함수 //
+// [1] 전역 변수 설정 (중복된 주소 변수 삭제)
+let sheetData = []; 
+let tbody, statusEl, exportXLSX, exportPPT; // 전역 요소 변수 선언
+
+// [2] 초기화 로직
+document.addEventListener('DOMContentLoaded', async () => {
+    // 요소 찾기
+    tbody = document.querySelector("#item-tbody") || document.querySelector("#listTable tbody");
+    statusEl = document.getElementById("status");
+    exportXLSX = document.getElementById("exportXLSX");
+    exportPPT = document.getElementById("exportPPT");
+
+    const addBtn = document.getElementById("addRow");
+    if (addBtn) addBtn.onclick = () => addRow({});
+
+    // 시트 데이터 로드를 먼저 기다립니다 (async/await 활용)
+    await initSheetData();
+
+    // 데이터 로드 후 초기 행 생성 (드롭다운 즉시 활성화)
+    if (tbody && tbody.children.length === 0) {
+        addRow({});
+    }
+    
+    checkInputs();
+});
+
+// [3] 구글 시트 데이터 로드
 async function initSheetData() {
+    // 최신 주소 하나만 유지
     const csvUrl = "https://docs.google.com/spreadsheets/d/1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY/gviz/tq?tqx=out:csv&gid=940822100";
 
     try {
         const response = await fetch(csvUrl);
         const data = await response.text();
         
-        // 줄바꿈으로 행 분리
-        const lines = data.split(/\r?\n/);
-        
-        // 💡 정밀 파싱: 쉼표가 포함된 텍스트도 한 칸으로 묶어줍니다.
-        const rows = lines.map(line => {
-            const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-            return matches ? matches.map(val => val.replace(/^"|"$/g, '').trim()) : [];
+        // 데이터 밀림 방지 정규식 파싱
+        const rows = data.split(/\r?\n/).map(row => {
+            return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => 
+                cell.replace(/^"|"$/g, '').trim()
+            );
         });
-
-        // 💡 B4~I94 데이터 추출 (4행부터 시작하므로 인덱스 3 사용)
-        // 시트의 실제 열 위치: B(1), C(2), D(3), E(4), F(5), G(6), H(7), I(8)
-        sheetData = rows.slice(3, 95).map(r => {
-            if (!r || r.length < 9) return null; // 데이터가 부족한 행 제외
-            return {
-                name: r[1],      // B열: 품목명
-                size: r[2],      // C열: 사이즈
-                material: r[4],  // E열: 재질
-                vendor: r[6],    // G열: 발주처
-                method: r[7],    // H열: 발주방법
-                contact: r[8]    // I열: 업체 연락처
-            };
-        }).filter(item => item && item.name && item.name !== "품명"); // 제목행 한 번 더 필터링
+        
+        // B4:I94 영역 데이터 가공
+        sheetData = rows.slice(3, 95).map(r => ({
+            name: r[1],      // B열: 품목
+            size: r[2],      // C열: 사이즈
+            material: r[4],  // E열: 재질
+            vendor: r[6],    // G열: 발주처
+            method: r[7],    // H열: 발주방법
+            contact: r[8]    // I열: 업체 연락처
+        })).filter(item => item.name);
 
         updateDatalistFromSheet();
-        console.log("✅ 시트 동기화 완료 (B4~I94)");
-    } catch (error) {
-        console.error("데이터 로드 실패:", error);
+        console.log("✅ 데이터 로드 완료");
+    } catch (e) {
+        console.warn("시트 로딩 실패:", e);
     }
 }
 
-// [2] 품목 선택 시 나머지 칸 자동 채우기
-function handleItemInput(e) {
-    const val = e.target.value.trim();
-    const row = e.target.closest('tr');
-    
-    // 시트 데이터에서 정확히 일치하는 품목 찾기
-    const found = sheetData.find(item => item.name === val);
-    
-    if (found) {
-        // HTML의 data-role과 시트 데이터를 연결
-        const mapping = {
-            'size': found.size,
-            'mat': found.material,
-            'vendor': found.vendor,
-            'contact': found.contact,
-            'memo': found.method // 발주방법을 비고(memo)란에 자동 입력
-        };
-
-        Object.keys(mapping).forEach(role => {
-            const input = row.querySelector(`[data-role="${role}"]`);
-            if (input) {
-                input.value = mapping[role] || "";
-            }
-        });
-        
-        if (typeof checkInputs === 'function') checkInputs();
-    }
-}
-
-// [3] 품목 드롭다운 리스트 갱신 (B열 내용만 보이게)
-function updateDatalistFromSheet() {
-    const datalist = document.getElementById('item-datalist');
-    if (!datalist) return;
-    
-    datalist.innerHTML = '';
-    sheetData.forEach(item => {
-        if(item.name) {
-            const option = document.createElement('option');
-            option.value = item.name;
-            datalist.appendChild(option);
-        }
-    });
-}
-
-// [4] 행 추가 함수 (오류 수정됨)
+// [4] 행 추가 함수
 function addRow(obj = {}) {
     if (!tbody) return;
     const tr = document.createElement("tr");
@@ -974,21 +953,17 @@ function addRow(obj = {}) {
     const itemInp = tr.querySelector('[data-role="item"]');
     itemInp.addEventListener('input', (e) => {
         handleItemInput(e);
-        if (typeof checkInputs === 'function') checkInputs();
+        checkInputs();
     });
 
     tr.querySelectorAll('input').forEach(inp => {
-        if(inp !== itemInp) {
-            inp.addEventListener('input', () => {
-                if (typeof checkInputs === 'function') checkInputs();
-            });
-        }
+        if(inp !== itemInp) inp.addEventListener('input', checkInputs);
     });
 
-    if (typeof checkInputs === 'function') checkInputs();
+    checkInputs();
 }
 
-// [5] 누락되었던 빈칸 검사 함수 (필수 추가)
+// [5] 빈칸 검사 함수
 function checkInputs() {
     const rows = tbody.querySelectorAll("tr");
     let allFilled = rows.length > 0;
@@ -1016,13 +991,12 @@ function checkInputs() {
     }
 }
 
-// [6] 기타 필요한 함수들 (이하 생략하지 말고 기존 코드에 맞춰 확인)
+// [6] 기타 매핑 함수
 function handleItemInput(e) {
     const val = e.target.value.trim();
-    if (!val) return; // 값이 없으면 실행 안 함
+    if (!val) return;
 
     const row = e.target.closest('tr');
-    // 정확히 일치하는 품목만 찾기
     const found = sheetData.find(item => item.name === val);
     
     if (found) {
@@ -1034,16 +1008,11 @@ function handleItemInput(e) {
             'memo': found.method
         };
 
-        // 데이터 채우기
         Object.keys(mapping).forEach(role => {
             const input = row.querySelector(`[data-role="${role}"]`);
-            if (input) {
-                input.value = mapping[role] || "";
-            }
+            if (input) input.value = mapping[role] || "";
         });
-        
-        // 입력 후 상태 체크 (빨간 테두리 제거 등)
-        if (typeof checkInputs === 'function') checkInputs();
+        checkInputs();
     }
 }
 

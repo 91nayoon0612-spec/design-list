@@ -902,22 +902,23 @@ async function initSheetData() {
         const response = await fetch(csvUrl);
         const data = await response.text();
         
-        // 1. 행별로 나누고 공백 제거
-        const rows = data.split(/\r?\n/).map(row => {
-            // 정규식을 더 안정적인 방식으로 수정
-            return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => 
-                cell.replace(/^"|"$/g, '').trim()
-            );
+        // 1. 행별로 나누기
+        const lines = data.split(/\r?\n/);
+        
+        // 2. slice(3, 95)를 제거하고 전체 행을 순회합니다.
+        const rows = lines.map(line => {
+            // 더 안정적인 CSV 파싱 로직
+            const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+            return matches ? matches.map(val => val.replace(/^"|"$/g, '').trim()) : [];
         });
         
-        // 2. slice(3, 95)를 제거하고 전체 데이터를 검사하여 필터링
+        // 3. 동적 필터링: 숫자로 제한하지 않고 내용이 있는 것만 추출
         sheetData = rows.map(r => {
-            // 열 개수가 부족한 행은 무시 (최소 I열까지 있어야 함)
-            if (r.length < 9) return null; 
+            if (!r || r.length < 9) return null; 
 
             return {
-                name: r[1],      // B열: 품목
-                size: r[2],      // C열: 사이즈
+                name: r[1],      // B열: 품명
+                size: r[2],      // C열: 규격
                 material: r[4],  // E열: 재질
                 vendor: r[6],    // G열: 발주처
                 method: r[7],    // H열: 발주방법
@@ -926,13 +927,13 @@ async function initSheetData() {
         }).filter(item => 
             item && 
             item.name && 
-            item.name !== "품명" &&  // 제목줄 자동 제외 (시작점 고정)
+            item.name !== "품명" &&  // 제목줄 자동 제거
             item.name !== "품목" &&
-            item.name.length > 0     // 빈 줄 제외
+            item.name.trim() !== ""  // 빈 줄 제거
         );
 
         updateDatalistFromSheet();
-        console.log(`✅ 총 ${sheetData.length}개의 품목을 성공적으로 로드했습니다.`);
+        console.log(`✅ 데이터 동기화 완료: 총 ${sheetData.length}개 항목 로드됨`);
     } catch (e) {
         console.warn("시트 로딩 실패:", e);
     }

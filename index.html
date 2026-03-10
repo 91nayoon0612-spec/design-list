@@ -866,34 +866,7 @@ if (nums && nums.length >= 2) {
     }
 };
 // --- [데이터 저장/로드 로직 시작] ---
-// [1] 전역 변수 및 구글 시트 설정
-let sheetData = []; 
-const csvUrl = "https://docs.google.com/spreadsheets/d/1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY/gviz/tq?tqx=out:csv&gid=940822100";
-
-// [2] 초기화 로직
-document.addEventListener('DOMContentLoaded', () => {
-    tbody = document.querySelector("#item-tbody") || document.querySelector("#listTable tbody");
-    statusEl = document.getElementById("status");
-    exportXLSX = document.getElementById("exportXLSX");
-    exportPPT = document.getElementById("exportPPT");
-
-    const addBtn = document.getElementById("addRow");
-    if (addBtn) {
-        addBtn.onclick = () => addRow({});
-    }
-
-    // 시트 데이터 로드 시도
-    initSheetData();
-
-    // 초기 빈 행 생성
-    if (tbody && tbody.children.length === 0) {
-        addRow({});
-    }
-    
-    if (typeof checkInputs === 'function') checkInputs();
-});
-
-// [3] 구글 시트 데이터 로드 (CORS 대응)
+// [1] 구글 시트 데이터 로드 및 정밀 파싱
 async function initSheetData() {
     const csvUrl = "https://docs.google.com/spreadsheets/d/1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY/gviz/tq?tqx=out:csv&gid=940822100";
 
@@ -901,20 +874,19 @@ async function initSheetData() {
         const response = await fetch(csvUrl);
         const data = await response.text();
         
-        // 1. 줄바꿈으로 행을 나눕니다.
+        // 줄바꿈으로 행 분리
         const lines = data.split(/\r?\n/);
         
-        // 2. 각 행을 정밀 파싱합니다 (쉼표가 데이터 안에 있어도 밀리지 않음)
+        // 💡 정밀 파싱: 쉼표가 포함된 텍스트도 한 칸으로 묶어줍니다.
         const rows = lines.map(line => {
-            // 정규식: 쉼표로 나누되, 큰따옴표 안의 쉼표는 무시함
             const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
             return matches ? matches.map(val => val.replace(/^"|"$/g, '').trim()) : [];
         });
 
-        // 3. B4:I94 데이터 가공 (Index 3부터 시작)
-        // r[1]이 B열(품목명)입니다.
+        // 💡 B4~I94 데이터 추출 (4행부터 시작하므로 인덱스 3 사용)
+        // 시트의 실제 열 위치: B(1), C(2), D(3), E(4), F(5), G(6), H(7), I(8)
         sheetData = rows.slice(3, 95).map(r => {
-            if (!r || r.length < 2) return null;
+            if (!r || r.length < 9) return null; // 데이터가 부족한 행 제외
             return {
                 name: r[1],      // B열: 품목명
                 size: r[2],      // C열: 사이즈
@@ -923,13 +895,57 @@ async function initSheetData() {
                 method: r[7],    // H열: 발주방법
                 contact: r[8]    // I열: 업체 연락처
             };
-        }).filter(item => item && item.name); // 품목명이 비어있는 행은 제외
+        }).filter(item => item && item.name && item.name !== "품명"); // 제목행 한 번 더 필터링
 
         updateDatalistFromSheet();
-        console.log("✅ 데이터 정제 완료");
+        console.log("✅ 시트 동기화 완료 (B4~I94)");
     } catch (error) {
-        console.warn("데이터 로드 중 오류:", error);
+        console.error("데이터 로드 실패:", error);
     }
+}
+
+// [2] 품목 선택 시 나머지 칸 자동 채우기
+function handleItemInput(e) {
+    const val = e.target.value.trim();
+    const row = e.target.closest('tr');
+    
+    // 시트 데이터에서 정확히 일치하는 품목 찾기
+    const found = sheetData.find(item => item.name === val);
+    
+    if (found) {
+        // HTML의 data-role과 시트 데이터를 연결
+        const mapping = {
+            'size': found.size,
+            'mat': found.material,
+            'vendor': found.vendor,
+            'contact': found.contact,
+            'memo': found.method // 발주방법을 비고(memo)란에 자동 입력
+        };
+
+        Object.keys(mapping).forEach(role => {
+            const input = row.querySelector(`[data-role="${role}"]`);
+            if (input) {
+                input.value = mapping[role] || "";
+            }
+        });
+        
+        if (typeof checkInputs === 'function') checkInputs();
+    }
+}
+
+// [3] 품목 드롭다운 리스트 갱신 (B열 내용만 보이게)
+function updateDatalistFromSheet() {
+    const datalist = document.getElementById('item-datalist');
+    if (!datalist) return;
+    
+    datalist.innerHTML = '';
+    sheetData.forEach(item => {
+        if(item.name) {
+            const option = document.createElement('option');
+            option.value = item.name;
+            datalist.appendChild(option);
+        }
+    });
 }
 
 // [4] 행 추가 함수 (오류 수정됨)

@@ -895,38 +895,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // [3] 구글 시트 데이터 로드 (CORS 대응)
 async function initSheetData() {
-    // 엑셀 깨짐과 데이터 밀림 방지를 위한 최적화 주소
-    const spreadsheetId = "1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY"; // 사용자님의 시트 ID
-    const sheetName = encodeURIComponent("제작물 목록");
-    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${sheetName}`;
+    const csvUrl = "https://docs.google.com/spreadsheets/d/1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY/gviz/tq?tqx=out:csv&gid=940822100";
 
     try {
-        const response = await fetch(url);
-        const buffer = await response.arrayBuffer();
+        const response = await fetch(csvUrl);
+        const data = await response.text();
         
-        // 한글 깨짐 방지를 위한 UTF-8 디코딩
-        const decoder = new TextDecoder('utf-8');
-        const data = decoder.decode(buffer);
-        
-        // 데이터 밀림 방지를 위한 정규식 파싱 (쉼표가 데이터 안에 있어도 안전하게 분리)
+        // 💡 핵심 수정: 데이터 내부에 쉼표가 있어도 밀리지 않게 파싱하는 정규식입니다.
         const rows = data.split(/\r?\n/).map(row => {
-            return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim());
+            return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => 
+                cell.replace(/^"|"$/g, '').trim()
+            );
         });
-
-        // B4:I94 데이터 가공 (행 번호 주의: 0부터 시작하므로 3번 인덱스가 4행)
+        
+        // B4:I94 영역 데이터 가공 (행 번호 3번 인덱스가 4행입니다)
         sheetData = rows.slice(3, 95).map(r => ({
-            name: r[1],      // B열: 품목
+            name: r[1],      // B열: 품목 (이미지에서 밀렸던 부분)
             size: r[2],      // C열: 사이즈
             material: r[4],  // E열: 재질
             vendor: r[6],    // G열: 발주처
             method: r[7],    // H열: 발주방법
-            contact: r[8]    // I열: 연락처
-        })).filter(item => item.name);
+            contact: r[8]    // I열: 업체 연락처
+        })).filter(item => item.name); // 품목명이 있는 것만 필터링
 
         updateDatalistFromSheet();
-        console.log("✅ 데이터 동기화 완료");
+        console.log("✅ 데이터 정렬 및 로드 완료");
     } catch (e) {
-        console.warn("⚠️ 데이터 로드 실패:", e);
+        console.warn("시트 로딩 실패:", e);
     }
 }
 

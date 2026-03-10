@@ -896,26 +896,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // [3] 구글 시트 데이터 로드
 async function initSheetData() {
+    // 웹 게시용 CSV URL
     const csvUrl = "https://docs.google.com/spreadsheets/d/1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY/gviz/tq?tqx=out:csv&gid=940822100";
 
     try {
         const response = await fetch(csvUrl);
-        const data = await response.text();
+        const csvText = await response.text();
         
-        // 1. 행별로 나누기
-        const lines = data.split(/\r?\n/);
-        
-        // 2. slice(3, 95)를 제거하고 전체 행을 순회합니다.
-        const rows = lines.map(line => {
-            // 더 안정적인 CSV 파싱 로직
-            const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-            return matches ? matches.map(val => val.replace(/^"|"$/g, '').trim()) : [];
-        });
-        
-        // 3. 동적 필터링: 숫자로 제한하지 않고 내용이 있는 것만 추출
-        sheetData = rows.map(r => {
-            if (!r || r.length < 9) return null; 
+        // 1. 단순 split이 아닌 CSV 전용 파싱 로직 (따옴표 내 쉼표/줄바꿈 완벽 대응)
+        const parseCSV = (text) => {
+            const result = [];
+            let row = [];
+            let col = "";
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i+1];
+                if (char === '"' && inQuotes && nextChar === '"') { col += '"'; i++; }
+                else if (char === '"') { inQuotes = !inQuotes; }
+                else if (char === ',' && !inQuotes) { row.push(col.trim()); col = ""; }
+                else if ((char === '\r' || char === '\n') && !inQuotes) {
+                    if (col !== "" || row.length > 0) {
+                        row.push(col.trim());
+                        result.push(row);
+                    }
+                    row = []; col = "";
+                    if (char === '\r' && nextChar === '\n') i++;
+                } else { col += char; }
+            }
+            if (col !== "" || row.length > 0) { row.push(col.trim()); result.push(row); }
+            return result;
+        };
 
+        const rows = parseCSV(csvText);
+
+        // 2. 동적 필터링: 제목줄(B열이 '품명'인 경우)을 찾아서 그 다음부터 가져오거나, 
+        // 데이터가 유효한 행(최소 9열 이상)만 추출
+        sheetData = rows.map(r => {
+            if (r.length < 9) return null; 
             return {
                 name: r[1],      // B열: 품명
                 size: r[2],      // C열: 규격
@@ -927,15 +945,15 @@ async function initSheetData() {
         }).filter(item => 
             item && 
             item.name && 
-            item.name !== "품명" &&  // 제목줄 자동 제거
-            item.name !== "품목" &&
-            item.name.trim() !== ""  // 빈 줄 제거
+            !["품명", "품목", "항목"].includes(item.name) && // 제목줄 제외
+            item.name.trim() !== "" // 빈 줄 제외
         );
 
         updateDatalistFromSheet();
-        console.log(`✅ 데이터 동기화 완료: 총 ${sheetData.length}개 항목 로드됨`);
-    } catch (e) {
-        console.warn("시트 로딩 실패:", e);
+        console.log(`✅ 데이터 로드 완료: 총 ${sheetData.length}개의 항목을 찾았습니다.`);
+        
+    } catch (error) {
+        console.error("❌ 시트 로딩 중 오류 발생:", error);
     }
 }
 

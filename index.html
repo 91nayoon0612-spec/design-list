@@ -868,7 +868,7 @@ if (nums && nums.length >= 2) {
 // --- [데이터 저장/로드 로직 시작] ---
 // [1] 전역 변수 및 구글 시트 설정
 let sheetData = []; 
-const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRXJzf-SItaIiKiXN6_zfckoZyV-4DkcUyzAwDMKLvJ0pMpE2HCPzwOEwduGlUVJR1kX1ZXLFROlhG4/pub?gid=940822100&single=true&output=csv";
+const csvUrl = "https://docs.google.com/spreadsheets/d/1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY/gviz/tq?tqx=out:csv&gid=940822100";
 
 // [2] 초기화 로직
 document.addEventListener('DOMContentLoaded', () => {
@@ -895,19 +895,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // [3] 구글 시트 데이터 로드 (CORS 대응)
 async function initSheetData() {
+    // 엑셀 깨짐과 데이터 밀림 방지를 위한 최적화 주소
+    const spreadsheetId = "1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY"; // 사용자님의 시트 ID
+    const sheetName = encodeURIComponent("제작물 목록");
+    const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${sheetName}`;
+
     try {
-        const response = await fetch(csvUrl);
-        if (!response.ok) throw new Error('Network response was not ok');
-        const data = await response.text();
-        const rows = data.split('\n').map(row => row.split(',').map(cell => cell.replace(/"/g, '').trim()));
+        const response = await fetch(url);
+        const buffer = await response.arrayBuffer();
         
+        // 한글 깨짐 방지를 위한 UTF-8 디코딩
+        const decoder = new TextDecoder('utf-8');
+        const data = decoder.decode(buffer);
+        
+        // 데이터 밀림 방지를 위한 정규식 파싱 (쉼표가 데이터 안에 있어도 안전하게 분리)
+        const rows = data.split(/\r?\n/).map(row => {
+            return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim());
+        });
+
+        // B4:I94 데이터 가공 (행 번호 주의: 0부터 시작하므로 3번 인덱스가 4행)
         sheetData = rows.slice(3, 95).map(r => ({
-            name: r[1], size: r[2], material: r[4], vendor: r[6], method: r[7], contact: r[8]
+            name: r[1],      // B열: 품목
+            size: r[2],      // C열: 사이즈
+            material: r[4],  // E열: 재질
+            vendor: r[6],    // G열: 발주처
+            method: r[7],    // H열: 발주방법
+            contact: r[8]    // I열: 연락처
         })).filter(item => item.name);
 
         updateDatalistFromSheet();
+        console.log("✅ 데이터 동기화 완료");
     } catch (e) {
-        console.warn("구글 시트 연동 실패: 로컬 보안 정책 또는 네트워크 문제 때문입니다. 수동 입력을 진행해 주세요.");
+        console.warn("⚠️ 데이터 로드 실패:", e);
     }
 }
 
@@ -982,14 +1001,31 @@ function checkInputs() {
 // [6] 기타 필요한 함수들 (이하 생략하지 말고 기존 코드에 맞춰 확인)
 function handleItemInput(e) {
     const val = e.target.value.trim();
+    if (!val) return; // 값이 없으면 실행 안 함
+
     const row = e.target.closest('tr');
+    // 정확히 일치하는 품목만 찾기
     const found = sheetData.find(item => item.name === val);
+    
     if (found) {
-        const mapping = { 'size': found.size, 'mat': found.material, 'vendor': found.vendor, 'contact': found.contact, 'memo': found.method };
-        for (const [role, value] of Object.entries(mapping)) {
+        const mapping = {
+            'size': found.size,
+            'mat': found.material,
+            'vendor': found.vendor,
+            'contact': found.contact,
+            'memo': found.method
+        };
+
+        // 데이터 채우기
+        Object.keys(mapping).forEach(role => {
             const input = row.querySelector(`[data-role="${role}"]`);
-            if (input) input.value = value || "";
-        }
+            if (input) {
+                input.value = mapping[role] || "";
+            }
+        });
+        
+        // 입력 후 상태 체크 (빨간 테두리 제거 등)
+        if (typeof checkInputs === 'function') checkInputs();
     }
 }
 

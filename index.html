@@ -901,27 +901,34 @@ async function initSheetData() {
         const response = await fetch(csvUrl);
         const data = await response.text();
         
-        // 💡 핵심 수정: 데이터 내부에 쉼표가 있어도 밀리지 않게 파싱하는 정규식입니다.
-        const rows = data.split(/\r?\n/).map(row => {
-            return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => 
-                cell.replace(/^"|"$/g, '').trim()
-            );
-        });
+        // 1. 줄바꿈으로 행을 나눕니다.
+        const lines = data.split(/\r?\n/);
         
-        // B4:I94 영역 데이터 가공 (행 번호 3번 인덱스가 4행입니다)
-        sheetData = rows.slice(3, 95).map(r => ({
-            name: r[1],      // B열: 품목 (이미지에서 밀렸던 부분)
-            size: r[2],      // C열: 사이즈
-            material: r[4],  // E열: 재질
-            vendor: r[6],    // G열: 발주처
-            method: r[7],    // H열: 발주방법
-            contact: r[8]    // I열: 업체 연락처
-        })).filter(item => item.name); // 품목명이 있는 것만 필터링
+        // 2. 각 행을 정밀 파싱합니다 (쉼표가 데이터 안에 있어도 밀리지 않음)
+        const rows = lines.map(line => {
+            // 정규식: 쉼표로 나누되, 큰따옴표 안의 쉼표는 무시함
+            const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+            return matches ? matches.map(val => val.replace(/^"|"$/g, '').trim()) : [];
+        });
+
+        // 3. B4:I94 데이터 가공 (Index 3부터 시작)
+        // r[1]이 B열(품목명)입니다.
+        sheetData = rows.slice(3, 95).map(r => {
+            if (!r || r.length < 2) return null;
+            return {
+                name: r[1],      // B열: 품목명
+                size: r[2],      // C열: 사이즈
+                material: r[4],  // E열: 재질
+                vendor: r[6],    // G열: 발주처
+                method: r[7],    // H열: 발주방법
+                contact: r[8]    // I열: 업체 연락처
+            };
+        }).filter(item => item && item.name); // 품목명이 비어있는 행은 제외
 
         updateDatalistFromSheet();
-        console.log("✅ 데이터 정렬 및 로드 완료");
-    } catch (e) {
-        console.warn("시트 로딩 실패:", e);
+        console.log("✅ 데이터 정제 완료");
+    } catch (error) {
+        console.warn("데이터 로드 중 오류:", error);
     }
 }
 

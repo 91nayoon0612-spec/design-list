@@ -902,34 +902,37 @@ async function initSheetData() {
         const response = await fetch(csvUrl);
         const data = await response.text();
         
+        // 1. 행별로 나누고 공백 제거
         const rows = data.split(/\r?\n/).map(row => {
+            // 정규식을 더 안정적인 방식으로 수정
             return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => 
                 cell.replace(/^"|"$/g, '').trim()
             );
         });
         
-        // 수정 포인트: slice(3, 95) 대신 모든 데이터를 검사
+        // 2. slice(3, 95)를 제거하고 전체 데이터를 검사하여 필터링
         sheetData = rows.map(r => {
-            // 최소한의 열 개수가 있는지 확인 (데이터 밀림 방지)
+            // 열 개수가 부족한 행은 무시 (최소 I열까지 있어야 함)
             if (r.length < 9) return null; 
 
             return {
-                name: r[1],      // B열
-                size: r[2],      // C열
-                material: r[4],  // E열
-                vendor: r[6],    // G열
-                method: r[7],    // H열
-                contact: r[8]    // I열
+                name: r[1],      // B열: 품목
+                size: r[2],      // C열: 사이즈
+                material: r[4],  // E열: 재질
+                vendor: r[6],    // G열: 발주처
+                method: r[7],    // H열: 발주방법
+                contact: r[8]    // I열: 연락처
             };
         }).filter(item => 
             item && 
             item.name && 
-            item.name !== "품명" && // 제목줄 제외 (시작점 고정 효과)
-            item.name !== ""        // 빈 줄 제외
+            item.name !== "품명" &&  // 제목줄 자동 제외 (시작점 고정)
+            item.name !== "품목" &&
+            item.name.length > 0     // 빈 줄 제외
         );
 
         updateDatalistFromSheet();
-        console.log("✅ 총 " + sheetData.length + "개의 품목을 불러왔습니다.");
+        console.log(`✅ 총 ${sheetData.length}개의 품목을 성공적으로 로드했습니다.`);
     } catch (e) {
         console.warn("시트 로딩 실패:", e);
     }

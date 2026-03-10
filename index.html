@@ -896,32 +896,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // [3] 구글 시트 데이터 로드
 async function initSheetData() {
-    // 최신 주소 하나만 유지
     const csvUrl = "https://docs.google.com/spreadsheets/d/1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY/gviz/tq?tqx=out:csv&gid=940822100";
 
     try {
         const response = await fetch(csvUrl);
         const data = await response.text();
         
-        // 데이터 밀림 방지 정규식 파싱
         const rows = data.split(/\r?\n/).map(row => {
             return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => 
                 cell.replace(/^"|"$/g, '').trim()
             );
         });
         
-        // B4:I94 영역 데이터 가공
-        sheetData = rows.slice(3, 95).map(r => ({
-            name: r[1],      // B열: 품목
-            size: r[2],      // C열: 사이즈
-            material: r[4],  // E열: 재질
-            vendor: r[6],    // G열: 발주처
-            method: r[7],    // H열: 발주방법
-            contact: r[8]    // I열: 업체 연락처
-        })).filter(item => item.name);
+        // 수정 포인트: slice(3, 95) 대신 모든 데이터를 검사
+        sheetData = rows.map(r => {
+            // 최소한의 열 개수가 있는지 확인 (데이터 밀림 방지)
+            if (r.length < 9) return null; 
+
+            return {
+                name: r[1],      // B열
+                size: r[2],      // C열
+                material: r[4],  // E열
+                vendor: r[6],    // G열
+                method: r[7],    // H열
+                contact: r[8]    // I열
+            };
+        }).filter(item => 
+            item && 
+            item.name && 
+            item.name !== "품명" && // 제목줄 제외 (시작점 고정 효과)
+            item.name !== ""        // 빈 줄 제외
+        );
 
         updateDatalistFromSheet();
-        console.log("✅ 데이터 로드 완료");
+        console.log("✅ 총 " + sheetData.length + "개의 품목을 불러왔습니다.");
     } catch (e) {
         console.warn("시트 로딩 실패:", e);
     }

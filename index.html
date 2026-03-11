@@ -542,108 +542,110 @@ const materialCatalog = {
 
 // 엑셀 다운로드 (스타일 및 레이아웃 적용 버전)
 document.getElementById("exportXLSX").onclick = () => {
-  const wb = XLSX.utils.book_new();
-  
-  // 행사명 입력값을 가져와 파일명으로 설정
-  const projNameVal = document.getElementById("projName").value.trim();
-  const finalFileName = projNameVal ? projNameVal : "제작물_발주_리스트";
+    try {
+        const wb = XLSX.utils.book_new();
+        
+        // 행사명 입력값을 가져와 파일명으로 설정
+        const projNameVal = document.getElementById("projName")?.value.trim() || "";
+        const finalFileName = projNameVal ? projNameVal : "제작물_발주_리스트";
 
-  // 1. 데이터 구성 (헤더 및 프로젝트 정보 포함)
-  const data = [
-    ["프로젝트 제작물 발주 리스트"], // R0
-    ["행사명", document.getElementById("projName").value, "행사일자", document.getElementById("projDate").value], // R1
-    ["행사장소", document.getElementById("projPlace").value, "담당PM", document.getElementById("projPM").value], // R2
-    ["비고(메모)", document.getElementById("projMemo").value, "", ""], // R3
-    [], // R4 (간격용 빈 줄)
-    ["품명", "사이즈", "수량", "재질", "발주업체", "연락처", "비고", "협의"] // R5 (테이블 헤더)
-  ];
-  
-  // 테이블 데이터 추가
-  tbody.querySelectorAll("tr").forEach(tr => {
-    data.push([
-      tr.querySelector('[data-role="item"]').value,
-      tr.querySelector('[data-role="size"]').value,
-      tr.querySelector('[data-role="qty"]').value,
-      tr.querySelector('[data-role="mat"]').value,
-      tr.querySelector('[data-role="vendor"]').value,
-      tr.querySelector('[data-role="contact"]').value,
-      tr.querySelector('[data-role="memo"]').value,
-      tr.querySelector('[data-role="consult"]').checked ? "Y" : "N"
-    ]);
-  });
+        // 1. 데이터 구성 (헤더 및 프로젝트 정보 포함)
+        const data = [
+            ["프로젝트 제작물 발주 리스트"], // R0
+            ["행사명", document.getElementById("projName")?.value || "", "행사일자", document.getElementById("projDate")?.value || ""], // R1
+            ["행사장소", document.getElementById("projPlace")?.value || "", "담당PM", document.getElementById("projPM")?.value || ""], // R2
+            ["비고(메모)", document.getElementById("projMemo")?.value || "", "", ""], // R3
+            [], // R4 (간격용 빈 줄)
+            ["품명", "사이즈", "수량", "재질", "발주업체", "연락처", "비고", "협의"] // R5 (테이블 헤더)
+        ];
+        
+        // 테이블 데이터 추가
+        tbody.querySelectorAll("tr").forEach(tr => {
+            // [중요 수정] data-role 명칭을 'isConsult'로 변경하고 에러 방지 처리 적용
+            const item = tr.querySelector('[data-role="item"]')?.value || "";
+            const size = tr.querySelector('[data-role="size"]')?.value || "";
+            const qty = tr.querySelector('[data-role="qty"]')?.value || "";
+            const mat = tr.querySelector('[data-role="mat"]')?.value || "";
+            const vendor = tr.querySelector('[data-role="vendor"]')?.value || "";
+            const contact = tr.querySelector('[data-role="contact"]')?.value || "";
+            const memo = tr.querySelector('[data-role="memo"]')?.value || "";
+            const consultEl = tr.querySelector('[data-role="isConsult"]');
+            const consult = consultEl ? (consultEl.checked ? "Y" : "N") : "N";
 
-  const ws = XLSX.utils.aoa_to_sheet(data);
+            data.push([item, size, qty, mat, vendor, contact, memo, consult]);
+        });
 
-  // 2. 셀 병합 설정
-  ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, // 메인 제목 병합
-    { s: { r: 3, c: 1 }, e: { r: 3, c: 3 } }  // 프로젝트 비고란 병합
-  ];
+        const ws = XLSX.utils.aoa_to_sheet(data);
 
-  // 3. 열 너비 설정 (단위: 문자수 기준)
-  ws['!cols'] = [
-    { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, 
-    { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 8 }
-  ];
+        // 2. 셀 병합 설정
+        ws['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, 
+            { s: { r: 3, c: 1 }, e: { r: 3, c: 3 } }  
+        ];
 
-  // 4. 스타일 정의
-  const styleTitle = {
-    font: { name: "맑은 고딕", sz: 18, bold: true, color: { rgb: "FFFFFF" } },
-    alignment: { horizontal: "center", vertical: "center" },
-    fill: { fgColor: { rgb: "0F172A" } }
-  };
+        // 3. 열 너비 설정
+        ws['!cols'] = [
+            { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, 
+            { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 8 }
+        ];
 
-  const styleLabel = {
-    font: { bold: true },
-    fill: { fgColor: { rgb: "F2F6FF" } },
-    border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-  };
+        // 4. 스타일 정의 (xlsx-js-style 라이브러리 필요)
+        const styleTitle = {
+            font: { name: "맑은 고딕", sz: 18, bold: true, color: { rgb: "FFFFFF" } },
+            alignment: { horizontal: "center", vertical: "center" },
+            fill: { fgColor: { rgb: "0F172A" } }
+        };
 
-  const styleHeader = {
-    font: { bold: true, color: { rgb: "FFFFFF" } },
-    fill: { fgColor: { rgb: "2B6CFF" } },
-    alignment: { horizontal: "center" },
-    border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-  };
+        const styleLabel = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: "F2F6FF" } },
+            border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+        };
 
-  const styleRowA = { fill: { fgColor: { rgb: "D4E8FF" } }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
-  const styleRowB = { fill: { fgColor: { rgb: "FFFFFF" } }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
-  const styleConsult = { 
-    fill: { fgColor: { rgb: "FFECEC" } }, 
-    font: { color: { rgb: "E5484D" }, bold: true },
-    border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-  };
+        const styleHeader = {
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "2B6CFF" } },
+            alignment: { horizontal: "center" },
+            border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+        };
 
-  // 5. 스타일 적용 루프
-  const range = XLSX.utils.decode_range(ws['!ref']);
-  for (let R = range.s.r; R <= range.e.r; ++R) {
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const cell_ref = XLSX.utils.encode_cell({ r: R, c: C });
-      if (!ws[cell_ref]) continue;
+        const styleRowA = { fill: { fgColor: { rgb: "D4E8FF" } }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
+        const styleRowB = { fill: { fgColor: { rgb: "FFFFFF" } }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
+        const styleConsult = { 
+            fill: { fgColor: { rgb: "FFECEC" } }, 
+            font: { color: { rgb: "E5484D" }, bold: true },
+            border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+        };
 
-      // 제목 (0행)
-      if (R === 0) ws[cell_ref].s = styleTitle;
-      
-      // 프로젝트 정보 레이블 (1~3행의 홀수 열)
-      if (R >= 1 && R <= 3 && (C === 0 || C === 2)) ws[cell_ref].s = styleLabel;
+        // 5. 스타일 적용 루프
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cell_ref = XLSX.utils.encode_cell({ r: R, c: C });
+                if (!ws[cell_ref]) continue;
 
-      // 테이블 헤더 (5행)
-      if (R === 5) ws[cell_ref].s = styleHeader;
-
-      // 테이블 데이터 (6행 이상)
-      if (R >= 6) {
-        const isConsult = ws[XLSX.utils.encode_cell({ r: R, c: 7 })]?.v === "Y";
-        if (isConsult) {
-          ws[cell_ref].s = styleConsult;
-        } else {
-          ws[cell_ref].s = (R % 2 === 0) ? styleRowA : styleRowB;
+                if (R === 0) ws[cell_ref].s = styleTitle;
+                if (R >= 1 && R <= 3 && (C === 0 || C === 2)) ws[cell_ref].s = styleLabel;
+                if (R === 5) ws[cell_ref].s = styleHeader;
+                if (R >= 6) {
+                    const isConsult = ws[XLSX.utils.encode_cell({ r: R, c: 7 })]?.v === "Y";
+                    if (isConsult) {
+                        ws[cell_ref].s = styleConsult;
+                    } else {
+                        ws[cell_ref].s = (R % 2 === 0) ? styleRowA : styleRowB;
+                    }
+                }
+            }
         }
-      }
-    }
-  }
 
-  XLSX.utils.book_append_sheet(wb, ws, "제작물리스트");
-  XLSX.writeFile(wb, `${finalFileName}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "제작물리스트");
+        XLSX.writeFile(wb, `${finalFileName}.xlsx`);
+        console.log("✅ 엑셀 다운로드 성공");
+
+    } catch (error) {
+        console.error("❌ 엑셀 다운로드 중 오류 발생:", error);
+        alert("엑셀 생성 중 오류가 발생했습니다. 모든 필수 항목을 확인해 주세요.");
+    }
 };
 
 

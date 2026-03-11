@@ -345,7 +345,7 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
       <label>비고 (프로젝트 전체 메모)</label>
       <textarea
       id="projMemo"
-        style="width:95%;min-height:80px;padding:10px;border:1px solid #cfd7e6;border-radius:10px;font-size:13px;resize:vertical;"
+        style="width:98%;min-height:80px;padding:10px;border:1px solid #cfd7e6;border-radius:10px;font-size:13px;resize:vertical;"
         placeholder="예: 전체 일정 특이사항, 주요 의사결정 히스토리, 내부 공유 메모 등"></textarea>
     </div>
   </div>
@@ -1019,67 +1019,77 @@ function handleItemInput(e) {
 
     const row = e.target.closest('tr');
     
-    // 1. 데이터 검색
-    // 시트 데이터 (업체, 연락처, 비고용)
+    // 1. 데이터 검색 (시트=업체정보 / 카탈로그=가이드)
     const foundInSheet = sheetData.find(item => item.name === val);
-    // 카탈로그 데이터 (가이드 문구, 기본 규격용)
     const foundInCatalog = catalog.find(c => 
-        val.includes(c.type) || c.type.includes(val)
+        val === c.type || val.includes(c.type) || c.type.includes(val)
     );
     
-    // 2. 입력창 데이터 배분
     if (foundInSheet || foundInCatalog) {
+        // 2. 입력창 데이터 배분
         const mapping = {
             'size': foundInSheet?.size || foundInCatalog?.defaultSize || "",
             'mat': foundInSheet?.material || "",
             'vendor': foundInSheet?.vendor || "",
             'contact': foundInSheet?.contact || "",
-            'memo': foundInSheet?.method || "" // 비고란은 시트의 '발주방법' 데이터를 넣음
+            'memo': foundInSheet?.method || "" // 비고란은 시트의 '발주방법' 적용
         };
 
         Object.keys(mapping).forEach(role => {
             const input = row.querySelector(`[data-role="${role}"]`);
-            if (input) {
-                input.value = mapping[role] || "";
-            }
+            if (input) input.value = mapping[role] || "";
         });
 
-        // 3. 💡 상단 가이드박스(guideText)에 내용 출력
+        // 3. 상단 가이드박스(guideText)에 내용 출력
         const guideEl = document.getElementById('guideText');
         if (guideEl) {
             if (foundInCatalog && foundInCatalog.guide) {
-                // 줄바꿈(\n)을 브라우저에서 볼 수 있도록 <br>로 변환하거나 innerText 사용
                 guideEl.innerText = foundInCatalog.guide;
-                guideEl.style.color = "#333"; // 기본 글자색
+                guideEl.style.color = "#333";
             } else {
                 guideEl.innerText = "해당 품목의 등록된 가이드가 없습니다.";
                 guideEl.style.color = "#999";
             }
         }
-
-        checkInputs(); // 필수입력 체크
+        checkInputs();
     }
 }
 
+// [7] 데이터 리스트 업데이트 및 자동 실행
 function updateDatalistFromSheet() {
     const datalist = document.getElementById('item-datalist');
-    if (datalist) {
-        datalist.innerHTML = '';
-        
-        // 시트 데이터와 코드(catalog) 데이터를 합친 유니크한 이름 리스트 생성
-        const allNames = new Set([
-            ...sheetData.map(item => item.name),
-            ...catalog.map(c => c.type)
-        ]);
-        
-        allNames.forEach(name => {
-            if(name) {
-                const option = document.createElement('option');
-                option.value = name;
-                datalist.appendChild(option);
-            }
-        });
-    }
+    if (!datalist) return;
+
+    datalist.innerHTML = '';
+    
+    // 시트 데이터와 catalog 데이터를 합쳐서 중복 제거 후 리스트 생성
+    const allNames = new Set([
+        ...sheetData.map(item => item.name),
+        ...catalog.map(c => c.type)
+    ]);
+    
+    allNames.forEach(name => {
+        if(name) {
+            const option = document.createElement('option');
+            option.value = name;
+            datalist.appendChild(option);
+        }
+    });
+    console.log("드롭다운 리스트가 업데이트되었습니다.");
+}
+
+// 💡 중요: 페이지 로드 및 데이터 수신 시 드롭다운 함수 강제 실행
+document.addEventListener('DOMContentLoaded', () => {
+    updateDatalistFromSheet();
+});
+
+// 구글 시트 데이터가 로드된 후에도 리스트를 갱신하도록 추가
+const originalInitSheetData = window.initSheetData;
+if (originalInitSheetData) {
+    window.initSheetData = async function() {
+        await originalInitSheetData();
+        updateDatalistFromSheet();
+    };
 }
 
 </script>

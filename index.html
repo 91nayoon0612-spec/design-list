@@ -1019,34 +1019,33 @@ function handleItemInput(e) {
 
     const row = e.target.closest('tr');
     
-    // 1. 구글 시트 데이터에서 기본 정보 찾기 (사이즈, 재질, 업체 등)
+    // 1. 구글 시트 데이터 검색
     const foundInSheet = sheetData.find(item => item.name === val);
     
-    // 2. catalog 마스터 데이터에서 작업 가이드 찾기
-    const foundInCatalog = catalog.find(item => item.type === val);
+    // 2. 가이드 데이터(catalog) 검색 - 이름 일치 여부를 더 유연하게 검사
+    // (예: "포스터 " 처럼 공백이 있거나 "포스터(A1)" 등 포함 관계 확인)
+    const foundInCatalog = catalog.find(c => 
+        val.includes(c.type) || c.type.includes(val)
+    );
     
     if (foundInSheet || foundInCatalog) {
-        // 매핑할 데이터 객체 생성
         const mapping = {
-            'size': foundInSheet ? foundInSheet.size : (foundInCatalog ? foundInCatalog.defaultSize : ""),
-            'mat': foundInSheet ? foundInSheet.material : "",
-            'vendor': foundInSheet ? foundInSheet.vendor : "",
-            'contact': foundInSheet ? foundInSheet.contact : "",
-            // 💡 핵심 수정: 비고(memo)란에 구글 시트 내용 대신 catalog의 guide를 넣음
-            'memo': foundInCatalog ? foundInCatalog.guide : (foundInSheet ? foundInSheet.method : "")
+            'size': foundInSheet?.size || foundInCatalog?.defaultSize || "",
+            'mat': foundInSheet?.material || "",
+            'vendor': foundInSheet?.vendor || "",
+            'contact': foundInSheet?.contact || "",
+            // 가이드 우선 적용, 없으면 시트의 발주방법 적용
+            'memo': foundInCatalog?.guide || foundInSheet?.method || ""
         };
 
-        // 입력창에 값 배분
         Object.keys(mapping).forEach(role => {
             const input = row.querySelector(`[data-role="${role}"]`);
             if (input) {
-                // 기존 값이 비어있을 때만 자동 채우기를 하거나, 
-                // 품목을 변경할 때마다 새로 고침 (사용자 편의에 따라 선택 가능)
                 input.value = mapping[role] || "";
             }
         });
 
-        checkInputs(); // 입력 상태 확인 (버튼 활성화 등)
+        checkInputs();
     }
 }
 

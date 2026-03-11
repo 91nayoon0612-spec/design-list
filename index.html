@@ -345,7 +345,7 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
       <label>비고 (프로젝트 전체 메모)</label>
       <textarea
       id="projMemo"
-        style="width:98%;min-height:80px;padding:10px;border:1px solid #cfd7e6;border-radius:10px;font-size:13px;resize:vertical;"
+        style="width:99%;min-height:80px;padding:10px;border:1px solid #cfd7e6;border-radius:10px;font-size:13px;resize:vertical;"
         placeholder="예: 전체 일정 특이사항, 주요 의사결정 히스토리, 내부 공유 메모 등"></textarea>
     </div>
   </div>
@@ -416,7 +416,7 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
     </div>
 
     <div class="guide" id="guideBox">
-      <h3>💡 가이드</h3>
+      <h3>💡 제작물 가이드</h3>
       <p id="guideText">품명을 선택하면 해당 제작물의 안내 문구가 여기에 표시됩니다.</p>
       <div class="small-note">※ “협의중” 체크 시 사이즈/수량/비고가 자동으로 “협의중”으로 변경됩니다.</div>
     </div>
@@ -452,10 +452,9 @@ const catalog = [
   { type:"식권, 도시락쿠폰", category:"인쇄물", defaultSize:"90×50mm", guide:"• 점칼선 여부 / 숫자여부 전달해주세요." },
   { type:"리무버블 스티커", category:"인쇄물", defaultSize:"180×85mm", guide:"• 주차스티커로 사용 가능 합니다." },
   { type:"X배너", category:"현장 설치물", defaultSize:"600×1800mm", guide:"• 거치대 포함/미포함 여부를 반드시 확인해 주세요.\n• 화살표 스티커 별도부착(시트지)" },
-  { type:"가로등배너(가로등현수막)", category:"현장 설치물", defaultSize:"600×1800mm", guide:"• 2개 1세트. 설치단위 00조. \n• 상하단 재봉라인 80mm." },
+  { type:"가로등배너", category:"현장 설치물", defaultSize:"600*1800mm", guide:"• 2개 1세트. 설치단위 n조. \n• 상하단 재봉라인 80mm." },
   { type:"가로현수막", category:"현장 설치물", defaultSize:"현장 실측", guide:"• 현수막 위치에 따른 마감방법 확인해주세요.\n• 사방타공(아일렛), 상단바텐, 하단봉, 양쪽각목" },
   { type:"세로현수막", category:"현장 설치물", defaultSize:"현장 실측", guide:"• 현수막 위치에 따른 마감방법 확인해주세요.\n• 사방타공(아일렛), 상단바텐, 하단봉, 양쪽각목" },
-  { type:"통천현수막", category:"현장 설치물", defaultSize:"현장 실측", guide:"• 현수막 위치에 따른 마감방법 확인해주세요.\n• 사방타공(아일렛), 상단바텐, 하단봉, 양쪽각목" },
   { type:"백월현수막", category:"현장 설치물", defaultSize:"현장 실측", guide:"• 현수막 위치에 따른 마감방법 확인해주세요.\n• 사방타공(아일렛), 상단바텐, 하단봉, 양쪽각목" },
   { type:"외부대형현수막", category:"현장 설치물", defaultSize:"현장 실측", guide:"• 현수막 위치에 따른 마감방법 확인해주세요.\n• 사방타공(아일렛), 상단바텐, 하단봉, 양쪽각목" },
   { type:"포디움가림막(연단가림막)", category:"현장 설치물", defaultSize:"현장 실측", guide:"• 포디움 실제 규격에 따라 변경될 수 있어요.\n• 부착 방식(벨크로/타공 등)도 확인 권장." },

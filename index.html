@@ -868,13 +868,12 @@ if (nums && nums.length >= 2) {
 // --- [데이터 저장/로드 로직 시작] ---
 
 // 여기서 부터 아래로 구글시트 내용 불러오는 함수 //
-// [1] 전역 변수 설정 (중복된 주소 변수 삭제)
+// [1] 전역 변수 설정
 let sheetData = []; 
-let tbody, statusEl, exportXLSX, exportPPT; // 전역 요소 변수 선언
+let tbody, statusEl, exportXLSX, exportPPT;
 
 // [2] 초기화 로직
 document.addEventListener('DOMContentLoaded', async () => {
-    // 요소 찾기
     tbody = document.querySelector("#item-tbody") || document.querySelector("#listTable tbody");
     statusEl = document.getElementById("status");
     exportXLSX = document.getElementById("exportXLSX");
@@ -883,46 +882,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     const addBtn = document.getElementById("addRow");
     if (addBtn) addBtn.onclick = () => addRow({});
 
-    // 시트 데이터 로드를 먼저 기다립니다 (async/await 활용)
+    // 구글 시트 데이터 로드 (89개 전체 로드를 보장)
     await initSheetData();
 
-    // 데이터 로드 후 초기 행 생성 (드롭다운 즉시 활성화)
+    // 초기 행 생성
     if (tbody && tbody.children.length === 0) {
         addRow({});
     }
-    
     checkInputs();
 });
 
-// [3] 구글 시트 데이터 로드
+// [3] 구글 시트 데이터 로드 및 정밀 파싱 (89개 항목 대응)
 async function initSheetData() {
-    // 웹 게시용 CSV URL
     const csvUrl = "https://docs.google.com/spreadsheets/d/1JZi5axA03cuFOrZ0HuxK73AgDECCuH7_DP9QC48LRjY/gviz/tq?tqx=out:csv&gid=940822100";
 
     try {
         const response = await fetch(csvUrl);
         const csvText = await response.text();
         
-        // 1. 단순 split이 아닌 CSV 전용 파싱 로직 (따옴표 내 쉼표/줄바꿈 완벽 대응)
+        // 따옴표 및 쉼표 오류 방지용 정밀 파서
         const parseCSV = (text) => {
             const result = [];
-            let row = [];
-            let col = "";
-            let inQuotes = false;
+            let row = [], col = "", inQuotes = false;
             for (let i = 0; i < text.length; i++) {
-                const char = text[i];
-                const nextChar = text[i+1];
-                if (char === '"' && inQuotes && nextChar === '"') { col += '"'; i++; }
-                else if (char === '"') { inQuotes = !inQuotes; }
+                const char = text[i], next = text[i+1];
+                if (char === '"' && inQuotes && next === '"') { col += '"'; i++; }
+                else if (char === '"') inQuotes = !inQuotes;
                 else if (char === ',' && !inQuotes) { row.push(col.trim()); col = ""; }
                 else if ((char === '\r' || char === '\n') && !inQuotes) {
-                    if (col !== "" || row.length > 0) {
-                        row.push(col.trim());
-                        result.push(row);
-                    }
-                    row = []; col = "";
-                    if (char === '\r' && nextChar === '\n') i++;
-                } else { col += char; }
+                    if (col !== "" || row.length > 0) { row.push(col.trim()); result.push(row); }
+                    row = []; col = ""; if (char === '\r' && next === '\n') i++;
+                } else col += char;
             }
             if (col !== "" || row.length > 0) { row.push(col.trim()); result.push(row); }
             return result;
@@ -930,42 +920,26 @@ async function initSheetData() {
 
         const rows = parseCSV(csvText);
 
-        // 2. 동적 필터링: 제목줄(B열이 '품명'인 경우)을 찾아서 그 다음부터 가져오거나, 
-        // 데이터가 유효한 행(최소 9열 이상)만 추출
         sheetData = rows.map(r => {
             if (r.length < 9) return null; 
             return {
-                name: r[1],      // B열: 품명
-                size: r[2],      // C열: 규격
-                material: r[4],  // E열: 재질
-                vendor: r[6],    // G열: 발주처
-                method: r[7],    // H열: 발주방법
-                contact: r[8]    // I열: 연락처
+                name: r[1], size: r[2], material: r[4], vendor: r[6], method: r[7], contact: r[8]
             };
-        }).filter(item => 
-            item && 
-            item.name && 
-            !["품명", "품목", "항목"].includes(item.name) && // 제목줄 제외
-            item.name.trim() !== "" // 빈 줄 제외
-        );
+        }).filter(item => item && item.name && !["품명", "품목"].includes(item.name));
 
         updateDatalistFromSheet();
-        console.log(`✅ 데이터 로드 완료: 총 ${sheetData.length}개의 항목을 찾았습니다.`);
-        
-    } catch (error) {
-        console.error("❌ 시트 로딩 중 오류 발생:", error);
-    }
+        console.log(`✅ ${sheetData.length}개 품목 로드 완료`);
+    } catch (e) { console.warn("시트 로딩 실패:", e); }
 }
 
-// [4] 행 추가 함수
+// [4] 행 관리 함수 (복제/삭제/추가)
 function addRow(obj = {}) {
     if (!tbody) return;
     const tr = document.createElement("tr");
-    
     tr.innerHTML = `
         <td><input type="text" data-role="item" list="item-datalist" placeholder="품목 선택" value="${obj.item || ''}"></td>
         <td><input type="text" data-role="size" placeholder="규격" value="${obj.size || ''}"></td>
-        <td><input type="number" data-role="qty" placeholder="수량" value="${obj.qty || ''}"></td>
+        <td><input type="number" data-role="qty" placeholder="수량" value="${obj.qty || '1'}"></td>
         <td><input type="text" data-role="mat" placeholder="재질" value="${obj.mat || ''}"></td>
         <td><input type="text" data-role="vendor" placeholder="발주처" value="${obj.vendor || ''}"></td>
         <td><input type="text" data-role="contact" placeholder="연락처" value="${obj.contact || ''}"></td>
@@ -981,38 +955,52 @@ function addRow(obj = {}) {
     tbody.appendChild(tr);
 
     const itemInp = tr.querySelector('[data-role="item"]');
-    itemInp.addEventListener('input', (e) => {
-        handleItemInput(e);
-        checkInputs();
-    });
-
-    tr.querySelectorAll('input').forEach(inp => {
-        if(inp !== itemInp) inp.addEventListener('input', checkInputs);
-    });
-
+    itemInp.addEventListener('input', (e) => { handleItemInput(e); checkInputs(); });
+    tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', checkInputs));
     checkInputs();
 }
 
-// [5] 빈칸 검사 함수
+// 복제 버튼 함수
+function copyRow(btn) {
+    const row = btn.closest('tr');
+    addRow({
+        item: row.querySelector('[data-role="item"]').value,
+        size: row.querySelector('[data-role="size"]').value,
+        qty: row.querySelector('[data-role="qty"]').value,
+        mat: row.querySelector('[data-role="mat"]').value,
+        vendor: row.querySelector('[data-role="vendor"]').value,
+        contact: row.querySelector('[data-role="contact"]').value,
+        memo: row.querySelector('[data-role="memo"]').value,
+        isConsult: row.querySelector('[data-role="isConsult"]').checked
+    });
+}
+
+// 삭제 버튼 함수
+function removeRow(btn) {
+    btn.closest('tr').remove();
+    checkInputs();
+}
+
+// 빠른 품목 추가 버튼 함수
+function addQuickNew(item, size, mat, vendor, contact, memo) {
+    addRow({ item, size, mat, vendor, contact, memo, qty: 1 });
+}
+
+// [5] 입력 검사 및 버튼 활성화
 function checkInputs() {
+    if (!tbody) return;
     const rows = tbody.querySelectorAll("tr");
     let allFilled = rows.length > 0;
-
     rows.forEach(row => {
-        const requiredRoles = ['item', 'size', 'qty', 'vendor'];
-        requiredRoles.forEach(role => {
+        ['item', 'size', 'qty', 'vendor'].forEach(role => {
             const input = row.querySelector(`[data-role="${role}"]`);
             if (input) {
-                if (!input.value.trim()) {
-                    input.style.border = "2px solid #ff4d4d";
-                    allFilled = false;
-                } else {
-                    input.style.border = "1px solid #d7dde6";
-                }
+                const isBlank = !input.value.trim();
+                input.style.border = isBlank ? "2px solid #ff4d4d" : "1px solid #d7dde6";
+                if (isBlank) allFilled = false;
             }
         });
     });
-
     if(exportXLSX) exportXLSX.disabled = !allFilled;
     if(exportPPT) exportPPT.disabled = !allFilled;
     if(statusEl) {
@@ -1021,26 +1009,17 @@ function checkInputs() {
     }
 }
 
-// [6] 기타 매핑 함수
+// [6] 데이터 매핑 함수
 function handleItemInput(e) {
     const val = e.target.value.trim();
     if (!val) return;
-
     const row = e.target.closest('tr');
     const found = sheetData.find(item => item.name === val);
-    
     if (found) {
-        const mapping = {
-            'size': found.size,
-            'mat': found.material,
-            'vendor': found.vendor,
-            'contact': found.contact,
-            'memo': found.method
-        };
-
-        Object.keys(mapping).forEach(role => {
+        const mapping = { 'size': found.size, 'mat': found.material, 'vendor': found.vendor, 'contact': found.contact, 'memo': found.method };
+        Object.entries(mapping).forEach(([role, value]) => {
             const input = row.querySelector(`[data-role="${role}"]`);
-            if (input) input.value = mapping[role] || "";
+            if (input) input.value = value || "";
         });
         checkInputs();
     }

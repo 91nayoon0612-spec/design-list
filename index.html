@@ -1065,10 +1065,19 @@ function updateDatalistFromSheet() {
     const datalist = document.getElementById('item-datalist');
     if (datalist) {
         datalist.innerHTML = '';
-        sheetData.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item.name;
-            datalist.appendChild(option);
+        
+        // 시트 데이터와 코드(catalog) 데이터를 합친 유니크한 이름 리스트 생성
+        const allNames = new Set([
+            ...sheetData.map(item => item.name),
+            ...catalog.map(c => c.type)
+        ]);
+        
+        allNames.forEach(name => {
+            if(name) {
+                const option = document.createElement('option');
+                option.value = name;
+                datalist.appendChild(option);
+            }
         });
     }
 }

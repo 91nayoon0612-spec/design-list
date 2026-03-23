@@ -824,50 +824,54 @@ const targetSize = size.includes('(') ? size.match(/\((.*?)\)/)[1] : size;
 const nums = targetSize.match(/\d+/g);
 
 if (nums && nums.length >= 2) {
-    // [기존 코드] 수치가 있을 때: 파란색 비율 사각형 생성
     w_mm = parseFloat(nums[0]);
     h_mm = parseFloat(nums[1]);
 
-    let rectW = (w_mm / 10) * 0.03937;
-    let rectH = (h_mm / 10) * 0.03937;
+    // mm를 인치로 변환 (PptxGenJS 기본 단위)
+    let rectW = w_mm * 0.03937; 
+    let rectH = h_mm * 0.03937;
 
-    const maxSafeW = 8.0;
-    const maxSafeH = 3.5;
+    const maxSafeW = 8.0; // 슬라이드 내 최대 허용 가로폭
+    const maxSafeH = 3.5; // 슬라이드 내 최대 허용 세로폭
 
-    if (rectW > maxSafeW || rectH > maxSafeH) {
-        const ratio = Math.min(maxSafeW / rectW, maxSafeH / rectH);
-        rectW *= ratio;
-        rectH *= ratio;
+    // [수정 포인트] 가로 210mm 초과 또는 세로 120mm 초과시에만 비율 축소 적용
+    if (w_mm > 210 || h_mm > 120) {
+        if (rectW > maxSafeW || rectH > maxSafeH) {
+            const ratio = Math.min(maxSafeW / rectW, maxSafeH / rectH);
+            rectW *= ratio;
+            rectH *= ratio;
+        }
     }
 
+    // 중앙 정렬 계산
     const rectX = (10 - rectW) / 2;
     const rectY = 1.2 + (maxSafeH - rectH) / 2;
 
+    // 도형 그리기
     slide.addShape("rect", {
         x: rectX, y: rectY, w: rectW, h: rectH,
         fill: { color: "cce8ff" },
         line: { color: "3b57ff", width: 1 }
     });
 
+    // 치수 텍스트 추가
     slide.addText(`${w_mm} x ${h_mm} (mm)`, {
         x: rectX, y: rectY + rectH + 0.3, w: rectW,
         fontSize: 10, fontFace: FONT_MEDIUM, align: 'center', color: "666666"
     });
 
 } else if (size.includes("현장 실측") || size.includes("협의중")) {
-    // [추가 코드] 수치가 없고 특정 키워드가 포함된 경우: 빨간색 경고 표시
-    const boxSize = 1.5; // 임의의 정사각형 크기 (1.5인치)
+    // [기존 유지] 수치가 없고 특정 키워드가 포함된 경우: 빨간색 경고 표시
+    const boxSize = 1.5; 
     const rectX = (10 - boxSize) / 2;
     const rectY = 1.2 + (3.5 - boxSize) / 2;
 
-    // 1. 임의의 정사각형 생성 (빨간색 점선 테두리)
     slide.addShape("rect", {
         x: rectX, y: rectY, w: boxSize, h: boxSize,
-        fill: { color: "fff0f0" }, // 아주 연한 빨간색 배경
-        line: { color: "ff0000", width: 1, dashType: 'dash' } // 빨간색 점선
+        fill: { color: "fff0f0" },
+        line: { color: "ff0000", width: 1, dashType: 'dash' }
     });
 
-    // 2. 중앙에 빨간색 경고 텍스트 표시
     const warningText = size.includes("현장 실측") ? "현장실측 필요" : "사이즈 협의중";
     slide.addText(warningText, {
         x: rectX, y: rectY, w: boxSize, h: boxSize,

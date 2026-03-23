@@ -431,7 +431,7 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
 
 
 <script>
-  
+
 window.onload = function() {
   // 오늘 날짜 가져오기 (KST 기준)
   const today = new Date();
@@ -589,7 +589,7 @@ const materialCatalog = {
 
 
 
-// 엑셀 다운로드 (스타일 및 레이아웃 적용 버전)
+// 엑셀 다운로드 (작성일 항목 추가 버전)
 document.getElementById("exportXLSX").onclick = () => {
     try {
         const wb = XLSX.utils.book_new();
@@ -603,14 +603,13 @@ document.getElementById("exportXLSX").onclick = () => {
             ["프로젝트 제작물 발주 리스트"], // R0
             ["행사명", document.getElementById("projName")?.value || "", "행사일자", document.getElementById("projDate")?.value || ""], // R1
             ["행사장소", document.getElementById("projPlace")?.value || "", "담당PM", document.getElementById("projPM")?.value || ""], // R2
-            ["비고(메모)", document.getElementById("projMemo")?.value || "", "", ""], // R3
+            ["비고(메모)", document.getElementById("projMemo")?.value || "", "작성일", document.getElementById("projCreateDate")?.value || ""], // R3 (✨ 작성일 추가)
             [], // R4 (간격용 빈 줄)
             ["품명", "사이즈", "수량", "재질", "발주업체", "연락처", "비고", "협의"] // R5 (테이블 헤더)
         ];
         
         // 테이블 데이터 추가
         tbody.querySelectorAll("tr").forEach(tr => {
-            // [중요 수정] data-role 명칭을 'isConsult'로 변경하고 에러 방지 처리 적용
             const item = tr.querySelector('[data-role="item"]')?.value || "";
             const size = tr.querySelector('[data-role="size"]')?.value || "";
             const qty = tr.querySelector('[data-role="qty"]')?.value || "";
@@ -626,10 +625,10 @@ document.getElementById("exportXLSX").onclick = () => {
 
         const ws = XLSX.utils.aoa_to_sheet(data);
 
-        // 2. 셀 병합 설정
+        // 2. 셀 병합 설정 (비고 칸 병합 해제 및 조정)
         ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, 
-            { s: { r: 3, c: 1 }, e: { r: 3, c: 3 } }  
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } } // 제목 행 병합
+            // { s: { r: 3, c: 1 }, e: { r: 3, c: 3 } }  <- 기존 병합 코드는 작성일 칸 확보를 위해 삭제하거나 수정해야 합니다.
         ];
 
         // 3. 열 너비 설정
@@ -638,7 +637,7 @@ document.getElementById("exportXLSX").onclick = () => {
             { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 8 }
         ];
 
-        // 4. 스타일 정의 (xlsx-js-style 라이브러리 필요)
+        // 4. 스타일 정의
         const styleTitle = {
             font: { name: "맑은 고딕", sz: 18, bold: true, color: { rgb: "FFFFFF" } },
             alignment: { horizontal: "center", vertical: "center" },
@@ -674,6 +673,7 @@ document.getElementById("exportXLSX").onclick = () => {
                 if (!ws[cell_ref]) continue;
 
                 if (R === 0) ws[cell_ref].s = styleTitle;
+                // 레이블 스타일 적용 (작성일 레이블인 R3, C2 포함)
                 if (R >= 1 && R <= 3 && (C === 0 || C === 2)) ws[cell_ref].s = styleLabel;
                 if (R === 5) ws[cell_ref].s = styleHeader;
                 if (R >= 6) {
@@ -689,14 +689,13 @@ document.getElementById("exportXLSX").onclick = () => {
 
         XLSX.utils.book_append_sheet(wb, ws, "제작물리스트");
         XLSX.writeFile(wb, `${finalFileName}.xlsx`);
-        console.log("✅ 엑셀 다운로드 성공");
+        console.log("✅ 엑셀 다운로드 성공 (작성일 포함)");
 
     } catch (error) {
         console.error("❌ 엑셀 다운로드 중 오류 발생:", error);
-        alert("엑셀 생성 중 오류가 발생했습니다. 모든 필수 항목을 확인해 주세요.");
+        alert("엑셀 생성 중 오류가 발생했습니다.");
     }
 };
-
 
 // PPT 다운로드 버튼 클릭 시 실행
 document.getElementById("exportPPT").onclick = () => {

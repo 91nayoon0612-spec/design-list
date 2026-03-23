@@ -593,11 +593,11 @@ const materialCatalog = {
 document.getElementById("exportXLSX").onclick = () => {
     try {
         const wb = XLSX.utils.book_new();
-        
         const projNameVal = document.getElementById("projName")?.value.trim() || "";
         const finalFileName = projNameVal ? projNameVal : "제작물_발주_리스트";
 
-        // 1. 데이터 구성 (D열 레이블 -> F열 레이블로 이동 위해 "" 추가)
+        // 1. 데이터 구성 (F열로 밀기 위해 중간에 "" 3개 추가)
+        // [A, B, C, D, E, F, G] 순서입니다.
         const data = [
             ["프로젝트 제작물 발주 리스트"], // R0
             ["행사명", document.getElementById("projName")?.value || "", "", "", "", "행사일자", document.getElementById("projDate")?.value || ""], // R1
@@ -607,7 +607,8 @@ document.getElementById("exportXLSX").onclick = () => {
             ["품명", "사이즈", "수량", "재질", "발주업체", "연락처", "비고", "협의"] // R5
         ];
         
-        // 테이블 데이터 로직 (기존과 동일)
+        // 테이블 본문 데이터 추가
+        const tbody = document.querySelector("#yourTableId tbody"); // 실제 tbody ID에 맞게 수정하세요
         tbody.querySelectorAll("tr").forEach(tr => {
             const item = tr.querySelector('[data-role="item"]')?.value || "";
             const size = tr.querySelector('[data-role="size"]')?.value || "";
@@ -623,18 +624,18 @@ document.getElementById("exportXLSX").onclick = () => {
 
         const ws = XLSX.utils.aoa_to_sheet(data);
 
-        // 2. 셀 병합 설정 (행사명, 장소, 비고 칸을 더 넓게 병합)
+        // 2. 셀 병합 설정 (B~E열 통합)
         ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, // 제목 통합
-            { s: { r: 1, c: 1 }, e: { r: 1, c: 4 } }, // 행사명 입력칸 확장 (B~E열)
-            { s: { r: 2, c: 1 }, e: { r: 2, c: 4 } }, // 행사장소 입력칸 확장 (B~E열)
-            { s: { r: 3, c: 1 }, e: { r: 3, c: 4 } }  // 비고 입력칸 확장 (B~E열)
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, // 제목
+            { s: { r: 1, c: 1 }, e: { r: 1, c: 4 } }, // 행사명 입력칸 (B~E)
+            { s: { r: 2, c: 1 }, e: { r: 2, c: 4 } }, // 행사장소 입력칸 (B~E)
+            { s: { r: 3, c: 1 }, e: { r: 3, c: 4 } }  // 비고 입력칸 (B~E)
         ];
 
         // 3. 열 너비 설정
         ws['!cols'] = [
-            { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 10 }, 
-            { wch: 10 }, { wch: 15 }, { wch: 25 }, { wch: 8 }
+            { wch: 15 }, { wch: 15 }, { wch: 5 }, { wch: 5 }, 
+            { wch: 5 }, { wch: 15 }, { wch: 25 }, { wch: 8 }
         ];
 
         // 4. 스타일 정의 (전달해주신 styleRowA, styleRowB 포함)
@@ -663,25 +664,33 @@ document.getElementById("exportXLSX").onclick = () => {
             border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
         };
 
-        // 5. 스타일 적용 루프
+        // 5. 스타일 적용 루프 (핵심 수정)
         const range = XLSX.utils.decode_range(ws['!ref']);
         for (let R = range.s.r; R <= range.e.r; ++R) {
             for (let C = range.s.c; C <= range.e.c; ++C) {
                 const cell_ref = XLSX.utils.encode_cell({ r: R, c: C });
-                if (!ws[cell_ref]) continue;
+                
+                // 💡 셀이 없으면 스타일을 입히기 위해 빈 셀 객체라도 생성
+                if (!ws[cell_ref]) ws[cell_ref] = { t: 's', v: '' };
 
                 if (R === 0) ws[cell_ref].s = styleTitle;
                 
-                // 레이블 스타일 적용 위치: A열(0)과 F열(5)
+                // 레이블 스타일: A열(0)과 F열(5)
                 if (R >= 1 && R <= 3 && (C === 0 || C === 5)) {
                     ws[cell_ref].s = styleLabel;
                 }
                 
+                // 데이터 입력값 스타일: B열(1)과 G열(6)
+                if (R >= 1 && R <= 3 && (C === 1 || C === 6)) {
+                    ws[cell_ref].s = styleRowB; // 혹은 다른 데이터용 스타일
+                }
+
                 if (R === 5) ws[cell_ref].s = styleHeader;
                 if (R >= 6) {
-                    const isConsult = ws[XLSX.utils.encode_cell({ r: R, c: 7 })]?.v === "Y";
+                    const consultCell = ws[XLSX.utils.encode_cell({ r: R, c: 7 })];
+                    const isConsult = consultCell ? consultCell.v === "Y" : false;
                     if (isConsult) {
-                        ws[cell_ref].s = { ...styleConsult, border: styleHeader.border };
+                        ws[cell_ref].s = styleConsult;
                     } else {
                         ws[cell_ref].s = (R % 2 === 0) ? styleRowA : styleRowB;
                     }

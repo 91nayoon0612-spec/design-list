@@ -589,26 +589,24 @@ const materialCatalog = {
 
 
 
-// 엑셀 다운로드 (작성일 항목 추가 버전)
+// 엑셀 다운로드 (항목 위치 조정 버전: B열 -> E열 이동)
 document.getElementById("exportXLSX").onclick = () => {
     try {
         const wb = XLSX.utils.book_new();
         
-        // 행사명 입력값을 가져와 파일명으로 설정
         const projNameVal = document.getElementById("projName")?.value.trim() || "";
         const finalFileName = projNameVal ? projNameVal : "제작물_발주_리스트";
 
-        // 1. 데이터 구성 (헤더 및 프로젝트 정보 포함)
+        // 1. 데이터 구성 (C열 대신 E열에 데이터 배치하도록 빈 문자열 추가)
         const data = [
             ["프로젝트 제작물 발주 리스트"], // R0
-            ["행사명", document.getElementById("projName")?.value || "", "행사일자", document.getElementById("projDate")?.value || ""], // R1
-            ["행사장소", document.getElementById("projPlace")?.value || "", "담당PM", document.getElementById("projPM")?.value || ""], // R2
-            ["비고(메모)", document.getElementById("projMemo")?.value || "", "작성일", document.getElementById("projCreateDate")?.value || ""], // R3 (✨ 작성일 추가)
-            [], // R4 (간격용 빈 줄)
-            ["품명", "사이즈", "수량", "재질", "발주업체", "연락처", "비고", "협의"] // R5 (테이블 헤더)
+            ["행사명", document.getElementById("projName")?.value || "", "", "행사일자", document.getElementById("projDate")?.value || ""], // R1 (C열 비우고 D열 레이블, E열 값)
+            ["행사장소", document.getElementById("projPlace")?.value || "", "", "담당PM", document.getElementById("projPM")?.value || ""], // R2
+            ["비고(메모)", document.getElementById("projMemo")?.value || "", "", "작성일", document.getElementById("projCreateDate")?.value || ""], // R3
+            [], // R4
+            ["품명", "사이즈", "수량", "재질", "발주업체", "연락처", "비고", "협의"] // R5
         ];
         
-        // 테이블 데이터 추가
         tbody.querySelectorAll("tr").forEach(tr => {
             const item = tr.querySelector('[data-role="item"]')?.value || "";
             const size = tr.querySelector('[data-role="size"]')?.value || "";
@@ -625,19 +623,21 @@ document.getElementById("exportXLSX").onclick = () => {
 
         const ws = XLSX.utils.aoa_to_sheet(data);
 
-        // 2. 셀 병합 설정 (비고 칸 병합 해제 및 조정)
+        // 2. 셀 병합 설정
         ws['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } } // 제목 행 병합
-            // { s: { r: 3, c: 1 }, e: { r: 3, c: 3 } }  <- 기존 병합 코드는 작성일 칸 확보를 위해 삭제하거나 수정해야 합니다.
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, // 제목 통합
+            { s: { r: 1, c: 1 }, e: { r: 1, c: 2 } }, // 행사명 입력칸 확장
+            { s: { r: 2, c: 1 }, e: { r: 2, c: 2 } }, // 행사장소 입력칸 확장
+            { s: { r: 3, c: 1 }, e: { r: 3, c: 2 } }  // 비고 입력칸 확장
         ];
 
-        // 3. 열 너비 설정
+        // 3. 열 너비 설정 (D, E열 너비 확보)
         ws['!cols'] = [
-            { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, 
-            { wch: 20 }, { wch: 20 }, { wch: 30 }, { wch: 8 }
+            { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, 
+            { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 8 }
         ];
 
-        // 4. 스타일 정의
+        // 4. 스타일 정의 (기존과 동일)
         const styleTitle = {
             font: { name: "맑은 고딕", sz: 18, bold: true, color: { rgb: "FFFFFF" } },
             alignment: { horizontal: "center", vertical: "center" },
@@ -647,6 +647,7 @@ document.getElementById("exportXLSX").onclick = () => {
         const styleLabel = {
             font: { bold: true },
             fill: { fgColor: { rgb: "F2F6FF" } },
+            alignment: { horizontal: "center" },
             border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
         };
 
@@ -657,15 +658,7 @@ document.getElementById("exportXLSX").onclick = () => {
             border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
         };
 
-        const styleRowA = { fill: { fgColor: { rgb: "D4E8FF" } }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
-        const styleRowB = { fill: { fgColor: { rgb: "FFFFFF" } }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
-        const styleConsult = { 
-            fill: { fgColor: { rgb: "FFECEC" } }, 
-            font: { color: { rgb: "E5484D" }, bold: true },
-            border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-        };
-
-        // 5. 스타일 적용 루프
+        // 5. 스타일 적용 루프 수정
         const range = XLSX.utils.decode_range(ws['!ref']);
         for (let R = range.s.r; R <= range.e.r; ++R) {
             for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -673,15 +666,20 @@ document.getElementById("exportXLSX").onclick = () => {
                 if (!ws[cell_ref]) continue;
 
                 if (R === 0) ws[cell_ref].s = styleTitle;
-                // 레이블 스타일 적용 (작성일 레이블인 R3, C2 포함)
-                if (R >= 1 && R <= 3 && (C === 0 || C === 2)) ws[cell_ref].s = styleLabel;
+                
+                // 레이블 스타일 적용 위치 변경 (A열(0)과 D열(3)이 레이블이 됨)
+                if (R >= 1 && R <= 3 && (C === 0 || C === 3)) {
+                    ws[cell_ref].s = styleLabel;
+                }
+                
                 if (R === 5) ws[cell_ref].s = styleHeader;
                 if (R >= 6) {
                     const isConsult = ws[XLSX.utils.encode_cell({ r: R, c: 7 })]?.v === "Y";
                     if (isConsult) {
-                        ws[cell_ref].s = styleConsult;
+                        ws[cell_ref].s = { ...styleConsult, border: styleHeader.border };
                     } else {
-                        ws[cell_ref].s = (R % 2 === 0) ? styleRowA : styleRowB;
+                        const baseStyle = (R % 2 === 0) ? styleRowA : styleRowB;
+                        ws[cell_ref].s = baseStyle;
                     }
                 }
             }

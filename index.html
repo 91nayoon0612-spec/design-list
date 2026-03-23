@@ -826,32 +826,35 @@ if (nums && nums.length >= 2) {
     w_mm = parseFloat(nums[0]);
     h_mm = parseFloat(nums[1]);
 
-    // 1. 기본 변환: mm를 인치로 변환
+    // 1. 기본 변환: mm를 인치로 변환 (1mm = 0.03937inch)
     let rectW = w_mm * 0.03937; 
     let rectH = h_mm * 0.03937;
 
-    const maxSafeW = 8.0; 
-    const maxSafeH = 3.5; 
+    const maxSafeW = 8.0; // 슬라이드 내 가로 최대 허용치
+    const maxSafeH = 3.5; // 슬라이드 내 세로 최대 허용치
 
-    // [수정된 핵심 로직]
-    // 210x120mm를 초과하는 경우에만 '슬라이드 안전 영역'에 맞춰 축소 프로세스 진행
-    if (w_mm > 210 || h_mm > 120) {
-        const ratio = Math.min(maxSafeW / rectW, maxSafeH / rectH);
-        // 계산된 비율이 1보다 작을 때만(즉, 안전영역보다 클 때만) 축소
-        if (ratio < 1) {
-            rectW *= ratio;
-            rectH *= ratio;
-        }
-    } else {
-        // [추가] 210x120mm 이하인 경우: 
-        // 너무 작게 보일 수 있으므로 시각적 확인을 위해 1.5배 정도만 키우거나 
-        // 혹은 그대로 유지 (사용자 요청대로 축소 없이 그대로 유지)
-        // rectW = rectW; 
-        // rectH = rectH;
+    // [핵심 수정] 가로와 세로를 각각 독립적으로 체크하여 축소 비율 결정
+    // 가로가 210mm를 넘고, 동시에 안전영역(8인치)보다 클 때만 가로 비율 계산
+    let widthRatio = 1;
+    if (w_mm > 210 && rectW > maxSafeW) {
+        widthRatio = maxSafeW / rectW;
     }
 
-    // 2. 배치 계산: maxSafeH(3.5)의 중앙에 배치하되, 
-    // 실제 그려질 rectH가 작으면 그만큼 위아래 여백이 생김
+    // 세로가 120mm를 넘고, 동시에 안전영역(3.5인치)보다 클 때만 세로 비율 계산
+    let heightRatio = 1;
+    if (h_mm > 120 && rectH > maxSafeH) {
+        heightRatio = maxSafeH / rectH;
+    }
+
+    // 두 비율 중 더 많이 축소해야 하는 값(더 작은 값)을 적용하여 '비율 유지'하며 축소
+    // 단, 기준치 이하인 경우에는 해당 축의 비율 계산을 무시하므로 
+    // 기준치 이하의 값들은 1:1에 가까운 실제 크기 느낌으로 그려짐
+    const finalRatio = Math.min(widthRatio, heightRatio);
+    
+    rectW *= finalRatio;
+    rectH *= finalRatio;
+
+    // 2. 배치 계산 (중앙 정렬)
     const rectX = (10 - rectW) / 2;
     const rectY = 1.2 + (maxSafeH - rectH) / 2;
 
@@ -862,7 +865,7 @@ if (nums && nums.length >= 2) {
         line: { color: "3b57ff", width: 1 }
     });
 
-    // 4. 텍스트 추가 (도형 바로 아래)
+    // 4. 텍스트 추가
     slide.addText(`${w_mm} x ${h_mm} (mm)`, {
         x: rectX, y: rectY + rectH + 0.1, w: rectW,
         fontSize: 10, fontFace: FONT_MEDIUM, align: 'center', color: "666666"

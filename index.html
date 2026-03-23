@@ -658,6 +658,22 @@ document.getElementById("exportXLSX").onclick = () => {
             border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
         };
 
+        const styleRowA = { 
+            fill: { fgColor: { rgb: "D4E8FF" } }, 
+             border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } 
+        };
+
+        const styleRowB = { 
+           fill: { fgColor: { rgb: "FFFFFF" } }, 
+           border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } 
+        };
+
+        const styleConsult = { 
+          fill: { fgColor: { rgb: "FFECEC" } }, 
+          font: { color: { rgb: "E5484D" }, bold: true },
+         border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
+        };
+
         // 5. 스타일 적용 루프 수정
         const range = XLSX.utils.decode_range(ws['!ref']);
         for (let R = range.s.r; R <= range.e.r; ++R) {

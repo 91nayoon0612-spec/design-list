@@ -443,7 +443,7 @@ function toggleConsulting(idx, isChecked) {
         row.contact = "협의중";
         row.memo = "협의중";
     } else {
-        // 체크 해제 시 "협의중" 문구 삭제 (다시 입력 가능하게)
+        // 체크 해제 시 "협의중" 문구만 삭제 (기존 데이터 복구가 어려우므로 빈칸 처리)
         if (row.size === "협의중") row.size = "";
         if (row.count === "협의중") row.count = "";
         if (row.material === "협의중") row.material = "";
@@ -452,9 +452,10 @@ function toggleConsulting(idx, isChecked) {
         if (row.memo === "협의중") row.memo = "";
     }
 
-    // 변경된 데이터를 화면에 즉시 반영 (가장 중요!)
+    // ⭐ 중요: 변경된 데이터를 화면에 즉시 반영하기 위해 다시 그립니다.
     renderTable();
 }
+
 // [2] 테이블을 화면에 그리는 함수 추가
 function renderTable() {
     const tbody = document.querySelector("#listTable tbody");
@@ -463,17 +464,24 @@ function renderTable() {
 
     data.forEach((item, idx) => {
         const tr = document.createElement("tr");
-        // 협의중일 때 행 전체에 'consulting' 클래스 적용 (빨간색 강조)
+        // 체크 시 배경색 변경 (CSS의 .consulting 클래스 활용)
         if (item.isConsulting) tr.className = "consulting";
 
         tr.innerHTML = `
             <td><input type="text" value="${item.name || ''}" oninput="data[${idx}].name=this.value; checkInputs();"></td>
+            
             <td><input type="text" value="${item.size || ''}" oninput="data[${idx}].size=this.value; checkInputs();" ${item.isConsulting ? 'readonly' : ''}></td>
+            
             <td><input type="text" value="${item.count || ''}" oninput="data[${idx}].count=this.value; checkInputs();" ${item.isConsulting ? 'readonly' : ''}></td>
-            <td><input type="text" value="${item.material || ''}" oninput="data[${idx}].material=this.value;"></td>
-            <td><input type="text" value="${item.vendor || ''}" oninput="data[${idx}].vendor=this.value; checkInputs();"></td>
-            <td><input type="text" value="${item.contact || ''}" oninput="data[${idx}].contact=this.value;"></td>
+            
+            <td><input type="text" value="${item.material || ''}" oninput="data[${idx}].material=this.value;" ${item.isConsulting ? 'readonly' : ''}></td>
+            
+            <td><input type="text" value="${item.vendor || ''}" oninput="data[${idx}].vendor=this.value; checkInputs();" ${item.isConsulting ? 'readonly' : ''}></td>
+            
+            <td><input type="text" value="${item.contact || ''}" oninput="data[${idx}].contact=this.value;" ${item.isConsulting ? 'readonly' : ''}></td>
+            
             <td><input type="text" value="${item.memo || ''}" oninput="data[${idx}].memo=this.value;" ${item.isConsulting ? 'readonly' : ''}></td>
+            
             <td style="text-align:center;">
                 <input type="checkbox" ${item.isConsulting ? "checked" : ""} onchange="toggleConsulting(${idx}, this.checked)">
             </td>
@@ -481,7 +489,7 @@ function renderTable() {
         `;
         tbody.appendChild(tr);
     });
-    checkInputs(); // 필수 항목 검증 함수 실행
+    checkInputs();
 }
 
 /** =========================

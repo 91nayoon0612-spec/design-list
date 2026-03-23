@@ -973,21 +973,24 @@ function addRow(obj = {}) {
     if (!tbody) return;
     const tr = document.createElement("tr");
     tr.innerHTML = `
-        <td><input type="text" data-role="item" list="item-datalist" placeholder="품목 선택" value="${obj.item || ''}"></td>
-        <td><input type="text" data-role="size" placeholder="규격" value="${obj.size || ''}"></td>
-        <td><input type="number" data-role="qty" placeholder="수량" value="${obj.qty || '1'}"></td>
-        <td><input type="text" data-role="mat" placeholder="재질" value="${obj.mat || ''}"></td>
-        <td><input type="text" data-role="vendor" placeholder="발주처" value="${obj.vendor || ''}"></td>
-        <td><input type="text" data-role="contact" placeholder="연락처" value="${obj.contact || ''}"></td>
-        <td><input type="text" data-role="memo" placeholder="비고" value="${obj.memo || ''}"></td>
-        <td style="text-align:center;"><input type="checkbox" data-role="isConsult" ${obj.isConsult ? 'checked' : ''}></td>
-        <td>
-            <div style="display:flex; gap:4px; justify-content:center;">
-                <button type="button" class="btn-copy" onclick="copyRow(this)">📋</button>
-                <button type="button" class="btn-del" onclick="removeRow(this)">🗑️</button>
-            </div>
-        </td>
-    `;
+    <td><input type="text" data-role="item" list="item-datalist" placeholder="품목 선택" value="${obj.item || ''}"></td>
+    <td><input type="text" data-role="size" placeholder="규격" value="${obj.size || ''}"></td>
+    <td><input type="number" data-role="qty" placeholder="수량" value="${obj.qty || '1'}"></td>
+    <td><input type="text" data-role="mat" placeholder="재질" value="${obj.mat || ''}"></td>
+    <td><input type="text" data-role="vendor" placeholder="발주처" value="${obj.vendor || ''}"></td>
+    <td><input type="text" data-role="contact" placeholder="연락처" value="${obj.contact || ''}"></td>
+    <td><input type="text" data-role="memo" placeholder="비고" value="${obj.memo || ''}"></td>
+    <td style="text-align:center;">
+        <input type="checkbox" data-role="isConsult" class="chk-consulting" 
+               onclick="toggleConsulting(this)" ${obj.isConsult ? 'checked' : ''}>
+    </td>
+    <td>
+        <div style="display:flex; gap:4px; justify-content:center;">
+            <button type="button" class="btn-copy" onclick="copyRow(this)">📋</button>
+            <button type="button" class="btn-del" onclick="removeRow(this)">🗑️</button>
+        </div>
+    </td>
+`;
     tbody.appendChild(tr);
 
     const itemInp = tr.querySelector('[data-role="item"]');
@@ -1124,6 +1127,32 @@ if (originalInitSheetData) {
         await originalInitSheetData();
         updateDatalistFromSheet();
     };
+}
+
+function toggleConsulting(chk) {
+    const row = chk.closest('tr'); // 현재 체크박스가 속한 행 찾기
+    const inputs = row.querySelectorAll('input[type="text"]');
+    
+    // 필드 순서: 0:품명, 1:사이즈, 2:수량, 3:재질, 4:발주업체, 5:연락처, 6:비고
+    const sizeInp = inputs[1];
+    const qtyInp = inputs[2];
+    const memoInp = inputs[6];
+
+    if (chk.checked) {
+        row.classList.add('consulting'); // 행 전체 강조 (분홍색 배경)
+        if (sizeInp) sizeInp.value = "협의중";
+        if (qtyInp) qtyInp.value = "협의중";
+        if (memoInp) memoInp.value = "협의중";
+    } else {
+        row.classList.remove('consulting');
+        // 체크 해제 시 내용을 비울지 유지할지 결정 (비우는 것이 깔끔함)
+        if (sizeInp.value === "협의중") sizeInp.value = "";
+        if (qtyInp.value === "협의중") qtyInp.value = "";
+        if (memoInp.value === "협의중") memoInp.value = "";
+    }
+    
+    // 필수 항목 체크 함수가 있다면 실행 (다운로드 버튼 활성화용)
+    if (typeof checkInputs === 'function') checkInputs();
 }
 
 </script>

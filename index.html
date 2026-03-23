@@ -433,19 +433,21 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
 function toggleConsulting(idx, isChecked) {
     if (!data[idx]) return;
     
+    // 데이터 모델에 상태 저장
     data[idx].isConsulting = isChecked;
 
     if (isChecked) {
-        // 체크 시 비고란에만 문구 삽입
+        // 비고란에만 문구 삽입
         data[idx].memo = "협의중인 내용";
     } else {
-        // 체크 해제 시 문구가 "협의중인 내용"일 경우에만 삭제
+        // 체크 해제 시 문구가 "협의중인 내용"일 때만 초기화
         if (data[idx].memo === "협의중인 내용") {
             data[idx].memo = "";
         }
     }
 
-    renderTable(); // 화면 갱신
+    // 💡 화면을 다시 그려야 변경된 memo 값이 input에 나타납니다.
+    renderTable(); 
 }
 
 // [2] 테이블을 화면에 그리는 함수 추가
@@ -1013,8 +1015,14 @@ async function initSheetData() {
         sheetData = rows.map(r => {
             if (r.length < 9) return null; 
             return {
-                name: r[1], size: r[2], material: r[4], vendor: r[6], method: r[7], contact: r[8]
-            };
+    name: r[1], 
+    size: r[2], 
+    material: r[4], 
+    vendor: r[6], 
+    method: r[7], 
+    contact: r[8],
+    isConsulting: false // 💡 여기에 "협의중 상태 아님"이라는 기본 꼬리표를 추가합니다!
+};
         }).filter(item => item && item.name && !["품명", "품목"].includes(item.name));
 
         updateDatalistFromSheet();

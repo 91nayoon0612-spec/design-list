@@ -819,7 +819,6 @@ function checkInputs() {
     
 // --- [시각적 비율 사각형 생성 로직 시작] ---
 let w_mm = 0, h_mm = 0;
-// 전제조건 4: 괄호 안의 mm 수치 우선 추출, 없으면 일반 숫자 추출
 const targetSize = size.includes('(') ? size.match(/\((.*?)\)/)[1] : size;
 const nums = targetSize.match(/\d+/g);
 
@@ -827,36 +826,45 @@ if (nums && nums.length >= 2) {
     w_mm = parseFloat(nums[0]);
     h_mm = parseFloat(nums[1]);
 
-    // mm를 인치로 변환 (PptxGenJS 기본 단위)
+    // 1. 기본 변환: mm를 인치로 변환
     let rectW = w_mm * 0.03937; 
     let rectH = h_mm * 0.03937;
 
-    const maxSafeW = 8.0; // 슬라이드 내 최대 허용 가로폭
-    const maxSafeH = 3.5; // 슬라이드 내 최대 허용 세로폭
+    const maxSafeW = 8.0; 
+    const maxSafeH = 3.5; 
 
-    // [수정 포인트] 가로 210mm 초과 또는 세로 120mm 초과시에만 비율 축소 적용
+    // [수정된 핵심 로직]
+    // 210x120mm를 초과하는 경우에만 '슬라이드 안전 영역'에 맞춰 축소 프로세스 진행
     if (w_mm > 210 || h_mm > 120) {
-        if (rectW > maxSafeW || rectH > maxSafeH) {
-            const ratio = Math.min(maxSafeW / rectW, maxSafeH / rectH);
+        const ratio = Math.min(maxSafeW / rectW, maxSafeH / rectH);
+        // 계산된 비율이 1보다 작을 때만(즉, 안전영역보다 클 때만) 축소
+        if (ratio < 1) {
             rectW *= ratio;
             rectH *= ratio;
         }
+    } else {
+        // [추가] 210x120mm 이하인 경우: 
+        // 너무 작게 보일 수 있으므로 시각적 확인을 위해 1.5배 정도만 키우거나 
+        // 혹은 그대로 유지 (사용자 요청대로 축소 없이 그대로 유지)
+        // rectW = rectW; 
+        // rectH = rectH;
     }
 
-    // 중앙 정렬 계산
+    // 2. 배치 계산: maxSafeH(3.5)의 중앙에 배치하되, 
+    // 실제 그려질 rectH가 작으면 그만큼 위아래 여백이 생김
     const rectX = (10 - rectW) / 2;
     const rectY = 1.2 + (maxSafeH - rectH) / 2;
 
-    // 도형 그리기
+    // 3. 도형 생성
     slide.addShape("rect", {
         x: rectX, y: rectY, w: rectW, h: rectH,
         fill: { color: "cce8ff" },
         line: { color: "3b57ff", width: 1 }
     });
 
-    // 치수 텍스트 추가
+    // 4. 텍스트 추가 (도형 바로 아래)
     slide.addText(`${w_mm} x ${h_mm} (mm)`, {
-        x: rectX, y: rectY + rectH + 0.3, w: rectW,
+        x: rectX, y: rectY + rectH + 0.1, w: rectW,
         fontSize: 10, fontFace: FONT_MEDIUM, align: 'center', color: "666666"
     });
 

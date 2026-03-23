@@ -433,20 +433,20 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
 function toggleConsulting(idx, isChecked) {
     if (!data[idx]) return;
     
-    // 데이터 모델에 상태 저장
+    // 1. 체크 상태 저장
     data[idx].isConsulting = isChecked;
 
+    // 2. 체크되었을 때 비고란 문구 강제 삽입
     if (isChecked) {
-        // 비고란에만 문구 삽입
         data[idx].memo = "협의중인 내용";
     } else {
-        // 체크 해제 시 문구가 "협의중인 내용"일 때만 초기화
+        // 체크 해제 시 문구가 '협의중인 내용'일 때만 삭제 (기존 작성 내용은 보존)
         if (data[idx].memo === "협의중인 내용") {
             data[idx].memo = "";
         }
     }
 
-    // 💡 화면을 다시 그려야 변경된 memo 값이 input에 나타납니다.
+    // 3. 💡 이 명령이 있어야 바뀐 내용이 화면에 즉시 나타납니다!
     renderTable(); 
 }
 

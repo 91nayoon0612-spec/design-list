@@ -608,7 +608,6 @@ document.getElementById("exportXLSX").onclick = () => {
         ];
         
         // 테이블 본문 데이터 추가
-        const tbody = document.querySelector("#yourTableId tbody"); // 실제 tbody ID에 맞게 수정하세요
         tbody.querySelectorAll("tr").forEach(tr => {
             const item = tr.querySelector('[data-role="item"]')?.value || "";
             const size = tr.querySelector('[data-role="size"]')?.value || "";

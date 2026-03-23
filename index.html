@@ -431,29 +431,21 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
 
 // [수정] 협의중 체크박스 클릭 시 동작 함수
 function toggleConsulting(idx, isChecked) {
-    const row = data[idx];
-    row.isConsulting = isChecked;
+    if (!data[idx]) return;
+    
+    data[idx].isConsulting = isChecked;
 
     if (isChecked) {
-        // 품명을 제외한 모든 항목을 "협의중"으로 변경
-        row.size = "협의중";
-        row.count = "협의중";
-        row.material = "협의중";
-        row.vendor = "협의중";
-        row.contact = "협의중";
-        row.memo = "협의중";
+        // 체크 시 비고란에만 문구 삽입
+        data[idx].memo = "협의중인 내용";
     } else {
-        // 체크 해제 시 "협의중" 문구 삭제
-        if (row.size === "협의중") row.size = "";
-        if (row.count === "협의중") row.count = "";
-        if (row.material === "협의중") row.material = "";
-        if (row.vendor === "협의중") row.vendor = "";
-        if (row.contact === "협의중") row.contact = "";
-        if (row.memo === "협의중") row.memo = "";
+        // 체크 해제 시 문구가 "협의중인 내용"일 경우에만 삭제
+        if (data[idx].memo === "협의중인 내용") {
+            data[idx].memo = "";
+        }
     }
 
-    // 💡 이 줄이 반드시 있어야 화면이 바뀝니다!
-    renderTable(); 
+    renderTable(); // 화면 갱신
 }
 
 // [2] 테이블을 화면에 그리는 함수 추가
@@ -480,7 +472,13 @@ tr.innerHTML = `
     
     <td><input type="text" value="${item.contact || ''}" oninput="data[${idx}].contact=this.value;" ${item.isConsulting ? 'readonly' : ''}></td>
     
-    <td><input type="text" value="${item.memo || ''}" oninput="data[${idx}].memo=this.value;" ${item.isConsulting ? 'readonly' : ''}></td>
+    <td>
+    <input type="text" 
+        value="${item.memo || ''}" 
+        oninput="data[${idx}].memo=this.value;" 
+        style="${item.isConsulting ? 'color: #d24726; font-weight: bold;' : ''}"
+        ${item.isConsulting ? 'readonly' : ''}>
+    </td>
     
     <td style="text-align:center;">
         <input type="checkbox" ${item.isConsulting ? "checked" : ""} onchange="toggleConsulting(${idx}, this.checked)">

@@ -252,21 +252,79 @@ button:disabled{opacity:.5;}
     border:1px dashed rgba(43,108,255,.45);
     background:#f5f8ff;
     border-radius:12px;
-    padding:12px 12px;
+    padding:14px 16px;
   }
-  .guide h3{
-    margin:0 0 6px 0;
-    font-size:14px;
+  .guide-header{
     display:flex;
     align-items:center;
     gap:8px;
+    font-size:14px;
+    font-weight:700;
+    color:#153a96;
+    margin-bottom:12px;
   }
-  .guide p{
-    margin:0;
-    color:#23304a;
+  .guide-empty{
+    color:#999;
     font-size:13px;
-    line-height:1.55;
+    padding:4px 0;
+  }
+  /* 4단 섹션 카드 그리드 */
+  .guide-grid{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:10px;
+  }
+  @media(max-width:900px){
+    .guide-grid{ grid-template-columns: repeat(2,1fr); }
+  }
+  .guide-card{
+    background:#fff;
+    border:1px solid #dce6f7;
+    border-radius:10px;
+    padding:12px 14px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .guide-card-label{
+    font-size:11px;
+    font-weight:700;
+    color:#6b778c;
+    text-transform:uppercase;
+    letter-spacing:.4px;
+    display:flex;
+    align-items:center;
+    gap:5px;
+  }
+  .guide-card-value{
+    font-size:13px;
+    color:#1b2330;
+    line-height:1.6;
     white-space:pre-wrap;
+    word-break:keep-all;
+  }
+  .guide-card-value.empty{
+    color:#bbb;
+    font-style:italic;
+  }
+  /* 예시 이미지 카드 */
+  .guide-card.img-card .guide-card-value{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:80px;
+  }
+  .guide-img{
+    max-width:100%;
+    max-height:140px;
+    border-radius:6px;
+    object-fit:contain;
+    border:1px solid #e8eef7;
+  }
+  .guide-img-placeholder{
+    color:#ccc;
+    font-size:12px;
+    text-align:center;
   }
   .small-note{
     margin-top:6px;
@@ -421,9 +479,11 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
     </div>
 
     <div class="guide" id="guideBox">
-      <h3>💡 제작물 가이드</h3>
-      <p id="guideText">품명을 선택하면 해당 제작물의 안내 문구가 여기에 표시됩니다.</p>
-      <div class="small-note">※ “협의중” 체크 시 사이즈/수량/비고가 자동으로 “협의중”으로 변경됩니다.</div>
+      <div class="guide-header">💡 제작물 가이드</div>
+      <div id="guideContent">
+        <p class="guide-empty">품명을 선택하면 해당 제작물의 안내 문구가 여기에 표시됩니다.</p>
+      </div>
+      <div class="small-note" style="margin-top:10px;">※ "협의중" 체크 시 사이즈/수량/비고가 자동으로 "협의중"으로 변경됩니다. &nbsp;|&nbsp; 가이드 내용은 구글 시트에서 관리합니다.</div>
     </div>
 
   </div>
@@ -1117,7 +1177,12 @@ async function initSheetData() {
     vendor: r[6], 
     method: r[7], 
     contact: r[8],
-    isConsulting: false // 💡 여기에 "협의중 상태 아님"이라는 기본 꼬리표를 추가합니다!
+    // ✅ 가이드 4단 섹션 (구글 시트 열 추가 필요: J=설명, K=사이즈추천, L=주의사항, M=예시이미지URL)
+    guideDesc:    r[9]  || "",   // J열: 설명
+    guideSize:    r[10] || "",   // K열: 사이즈 추천
+    guideCaution: r[11] || "",   // L열: 주의사항
+    guideImage:   r[12] || "",   // M열: 예시 이미지 URL
+    isConsulting: false
 };
         }).filter(item => item && item.name && !["품명", "품목"].includes(item.name));
 
@@ -1235,19 +1300,64 @@ function handleItemInput(e) {
             if (input) input.value = mapping[role] || "";
         });
 
-        // 3. 상단 가이드박스(guideText)에 내용 출력
-        const guideEl = document.getElementById('guideText');
-        if (guideEl) {
-            if (foundInCatalog && foundInCatalog.guide) {
-                guideEl.innerText = foundInCatalog.guide;
-                guideEl.style.color = "#333";
-            } else {
-                guideEl.innerText = "해당 품목의 등록된 가이드가 없습니다.";
-                guideEl.style.color = "#999";
-            }
-        }
+        // 3. 상단 가이드박스에 4단 섹션 카드 렌더링
+        renderGuideCards(foundInSheet, foundInCatalog);
         checkInputs();
     }
+}
+
+
+// [6-2] 제작물 가이드 4단 섹션 카드 렌더러
+// 구글 시트에서 읽어온 데이터(foundInSheet) 또는 catalog 데이터(foundInCatalog)를 기반으로
+// 설명 / 사이즈 추천 / 주의사항 / 예시 이미지 4개의 카드를 가이드 박스에 렌더링합니다.
+//
+// 📌 구글 시트 열 설정 방법:
+//   J열(10번째) = 설명
+//   K열(11번째) = 사이즈 추천
+//   L열(12번째) = 주의사항
+//   M열(13번째) = 예시 이미지 URL (구글 드라이브 직접 링크 또는 공개 이미지 URL)
+function renderGuideCards(sheetItem, catalogItem) {
+    const box = document.getElementById("guideContent");
+    if (!box) return;
+
+    // 데이터 우선순위: 시트 > catalog 순서로 병합
+    const desc    = sheetItem?.guideDesc    || catalogItem?.guide || "";
+    const size     = sheetItem?.guideSize    || catalogItem?.defaultSize || "";
+    const caution  = sheetItem?.guideCaution || "";
+    const imgUrl   = sheetItem?.guideImage   || "";
+
+    const hasAny = desc || size || caution || imgUrl;
+
+    if (!hasAny) {
+        box.innerHTML = '<p class="guide-empty">해당 품목의 등록된 가이드가 없습니다.</p>';
+        return;
+    }
+
+    const card = (ico, label, value, isImg) => {
+        if (isImg) {
+            const imgHtml = value
+                ? `<img class="guide-img" src="${value}" alt="예시 이미지" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+                   <span class="guide-img-placeholder" style="display:none;">이미지를 불러올 수 없습니다</span>`
+                : '<span class="guide-img-placeholder">시트 M열에 이미지 URL을 입력하면 여기에 표시됩니다</span>';
+            return `<div class="guide-card img-card">
+                      <div class="guide-card-label">${ico} ${label}</div>
+                      <div class="guide-card-value">${imgHtml}</div>
+                    </div>`;
+        }
+        const cls = value ? "" : " empty";
+        const txt = value || "정보 없음";
+        return `<div class="guide-card">
+                  <div class="guide-card-label">${ico} ${label}</div>
+                  <div class="guide-card-value${cls}">${txt}</div>
+                </div>`;
+    };
+
+    box.innerHTML = `<div class="guide-grid">
+        ${card("📄", "설명", desc)}
+        ${card("📐", "사이즈 추천", size)}
+        ${card("⚠️", "주의사항", caution)}
+        ${card("🖼️", "예시 이미지", imgUrl, true)}
+    </div>`;
 }
 
 // [7] 데이터 리스트 업데이트 및 자동 실행

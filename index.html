@@ -1177,11 +1177,11 @@ async function initSheetData() {
     vendor: r[6], 
     method: r[7], 
     contact: r[8],
-    // ✅ 가이드 4단 섹션 (구글 시트 열 추가 필요: J=설명, K=사이즈추천, L=주의사항, M=예시이미지URL)
-    guideDesc:    r[9]  || "",   // J열: 설명
-    guideSize:    r[10] || "",   // K열: 사이즈 추천
-    guideCaution: r[11] || "",   // L열: 주의사항
-    guideImage:   r[12] || "",   // M열: 예시 이미지 URL
+    // ✅ 가이드 4단 섹션 (구글 시트 열 추가 필요: K=가이드 설명, L=옵션 안내, M=유의사항, N=예시이미지(URL)
+    guideDesc:    r[10]  || "",   // K열: 가이드 설명
+    guideSize:    r[11] || "",   // L열: 옵션 안내
+    guideCaution: r[12] || "",   // M열: 유의사항
+    guideImage:   r[13] || "",   // N열: 예시 이미지 URL
     isConsulting: false
 };
         }).filter(item => item && item.name && !["품명", "품목"].includes(item.name));
@@ -1353,9 +1353,9 @@ function renderGuideCards(sheetItem, catalogItem) {
     };
 
     box.innerHTML = `<div class="guide-grid">
-        ${card("📄", "설명", desc)}
-        ${card("📐", "사이즈 추천", size)}
-        ${card("⚠️", "주의사항", caution)}
+        ${card("📄", "가이드 설명", desc)}
+        ${card("📐", "옵션안내", size)}
+        ${card("⚠️", "유의사항", caution)}
         ${card("🖼️", "예시 이미지", imgUrl, true)}
     </div>`;
 }

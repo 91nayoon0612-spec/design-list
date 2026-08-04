@@ -472,7 +472,9 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
   <button id="exportPPT" class="btn ppt" disabled style="background:#d24726; color:#fff;">PPT 다운로드</button>
   <button id="saveDraft" class="btn" style="background:#53dd5a;">💾 임시 저장</button>
   <button id="loadDraft" class="btn" style="background:#4a90d9; color:#fff;">📂 불러오기</button>
+  <button id="importXLSX" class="btn" style="background:#217346; color:#fff;">📋 엑셀 불러오기</button>
   <input type="file" id="loadDraftFile" accept=".jbak" style="display:none;">
+  <input type="file" id="importXLSXFile" accept=".xlsx,.xls" style="display:none;">
 </button>
 
         <div id="status" class="status">필수 항목(*)을 입력하면 다운로드가 활성화됩니다.</div>
@@ -1536,7 +1538,7 @@ function loadDraftFromFile(file) {
             setVal('projMemo',       p.memo);
 
             // 2. 제작물 리스트 복원
-            const tb = document.querySelector('#item-tbody') || document.querySelector('#listTable tbody');
+            const tb = document.querySelector('#item-tbody');
             if (tb) {
                 // 기존 행 전부 제거
                 while (tb.firstChild) tb.removeChild(tb.firstChild);
@@ -1626,6 +1628,115 @@ document.addEventListener('DOMContentLoaded', () => {
                 // input 초기화 (같은 파일 재선택 가능하도록)
                 e.target.value = '';
             }
+        });
+    }
+});
+
+// =====================================================
+// [엑셀 불러오기] - 저장된 .xlsx를 역파싱해서 폼 복원
+// 엑셀 구찰: R0=제목, R1~R3=프로젝트정보, R4=빈행, R5=헤더, R6~=데이터
+// =====================================================
+function importFromXLSX(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var data = new Uint8Array(e.target.result);
+            var wb   = XLSX.read(data, { type: 'array', cellText: false, cellDates: true });
+            var ws   = wb.Sheets[wb.SheetNames[0]];
+
+            var cell = function(r, c) {
+                var ref = XLSX.utils.encode_cell({ r: r, c: c });
+                var cel = ws[ref];
+                if (!cel) return '';
+                if (cel.t === 'd') return cel.v instanceof Date ? cel.v.toISOString().slice(0,10) : String(cel.v);
+                return (cel.v !== undefined && cel.v !== null) ? String(cel.v) : '';
+            };
+
+            if (cell(0, 0).indexOf('제작물') === -1) {
+                alert('올바르지 않은 파일입니다.\n이 도구에서 내보낸 엑셀 파일만 불러오질 수 있습니다.');
+                return;
+            }
+
+            var setVal = function(id, val) {
+                var el = document.getElementById(id);
+                if (el) el.value = val || '';
+            };
+            setVal('projName',       cell(1, 1));
+            setVal('projDate',       cell(1, 4));
+            setVal('projPlace',      cell(2, 1));
+            setVal('projPM',         cell(2, 4));
+            setVal('projMemo',       cell(3, 1));
+            setVal('projCreateDate', cell(3, 4));
+            setVal('projOrg', '');
+
+            var dataStartRow = 6;
+            for (var r2 = 3; r2 <= 8; r2++) {
+                if (cell(r2, 0) === '품명') { dataStartRow = r2 + 1; break; }
+            }
+
+            var tb = document.querySelector('#item-tbody') || document.querySelector('#listTable tbody');
+            if (!tb) { alert('제작물 테이블을 찾을 수 없습니다.'); return; }
+            while (tb.firstChild) tb.removeChild(tb.firstChild);
+
+            var wsRange = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+            var importedCount = 0;
+            for (var r = dataStartRow; r <= wsRange.e.r; r++) {
+                var item    = cell(r, 0);
+                var size    = cell(r, 1);
+                var qty     = cell(r, 2);
+                var mat     = cell(r, 3);
+                var vendor  = cell(r, 4);
+                var contact = cell(r, 5);
+                var memo    = cell(r, 6);
+                var consult = cell(r, 7);
+                if (!item && !size && !vendor) continue;
+                addRow({ item: item, size: size, qty: qty || '1', mat: mat, vendor: vendor, contact: contact, memo: memo, isConsult: false });
+                if (consult === 'Y') {
+                    var lastRow = tb.lastElementChild;
+                    if (lastRow) {
+                        var chk = lastRow.querySelector('[data-role="isConsult"]');
+                        if (chk) { chk.checked = true; toggleConsulting(chk); }
+                    }
+                }
+                importedCount++;
+            }
+            if (tb.children.length === 0) addRow({});
+            checkInputs();
+
+            var impBtn = document.getElementById('importXLSX');
+            if (impBtn) {
+                var origText = impBtn.textContent;
+                impBtn.textContent = '✅ 불러옴!';
+                impBtn.disabled = true;
+                setTimeout(function() { impBtn.textContent = origText; impBtn.disabled = false; }, 2500);
+            }
+            var statusEl2 = document.getElementById('status');
+            if (statusEl2) {
+                var prevText = statusEl2.textContent;
+                var prevColor = statusEl2.style.color;
+                statusEl2.textContent = '📋 엑셀 불러오기 완료 — ' + importedCount + '개 항목 복원됨';
+                statusEl2.style.color = '#217346';
+                setTimeout(function() { statusEl2.textContent = prevText; statusEl2.style.color = prevColor; }, 5000);
+            }
+        } catch(err) {
+            alert('엑셀 파일을 읽는 중 오류가 발생했습니다.\n\n상세: ' + err.message);
+            console.error(err);
+        }
+    };
+    reader.onerror = function() { alert('파일을 읽을 수 없습니다. 다시 시도해주세요.'); };
+    reader.readAsArrayBuffer(file);
+}
+
+// 엑셀 불러오기 버튼 바인딩
+document.addEventListener('DOMContentLoaded', function() {
+    var importBtn  = document.getElementById('importXLSX');
+    var importFile = document.getElementById('importXLSXFile');
+    if (importBtn && importFile) {
+        importBtn.addEventListener('click', function() { importFile.click(); });
+        importFile.addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (file) { importFromXLSX(file); e.target.value = ''; }
         });
     }
 });

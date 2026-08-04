@@ -461,7 +461,7 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
           <th style="width:70px"><span class="th-ico">📋</span>복사</th>
         </tr>
       </thead>
-      <tbody></tbody>
+      <tbody id="item-tbody"></tbody>
     </table>
 
     <div class="actions">
@@ -472,9 +472,7 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
   <button id="exportPPT" class="btn ppt" disabled style="background:#d24726; color:#fff;">PPT 다운로드</button>
   <button id="saveDraft" class="btn" style="background:#53dd5a;">💾 임시 저장</button>
   <button id="loadDraft" class="btn" style="background:#4a90d9; color:#fff;">📂 불러오기</button>
-  <button id="importXLSX" class="btn" style="background:#217346; color:#fff;">📋 엑셀 불러오기</button>
   <input type="file" id="loadDraftFile" accept=".jbak" style="display:none;">
-  <input type="file" id="importXLSXFile" accept=".xlsx,.xls" style="display:none;">
 </button>
 
         <div id="status" class="status">필수 항목(*)을 입력하면 다운로드가 활성화됩니다.</div>
@@ -1142,35 +1140,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         addRow({});
     }
     checkInputs();
-
-    // ── 드롭다운 리스트 초기화 ──
-    updateDatalistFromSheet();
-
-    // ── 임시 저장 버튼 ──
-    const saveDraftBtn = document.getElementById('saveDraft');
-    if (saveDraftBtn) saveDraftBtn.addEventListener('click', saveDraftToFile);
-
-    // ── .jbak 불러오기 버튼 ──
-    const loadDraftBtn  = document.getElementById('loadDraft');
-    const loadDraftFile = document.getElementById('loadDraftFile');
-    if (loadDraftBtn && loadDraftFile) {
-        loadDraftBtn.addEventListener('click', () => loadDraftFile.click());
-        loadDraftFile.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) { loadDraftFromFile(file); e.target.value = ''; }
-        });
-    }
-
-    // ── 엑셀 불러오기 버튼 ──
-    const importBtn  = document.getElementById('importXLSX');
-    const importFile = document.getElementById('importXLSXFile');
-    if (importBtn && importFile) {
-        importBtn.addEventListener('click', () => importFile.click());
-        importFile.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) { importFromXLSX(file); e.target.value = ''; }
-        });
-    }
 });
 
 // [3] 구글 시트 데이터 로드 및 정밀 파싱 (89개 항목 대응)
@@ -1416,7 +1385,10 @@ function updateDatalistFromSheet() {
     console.log("드롭다운 리스트가 업데이트되었습니다.");
 }
 
-// 💡 updateDatalistFromSheet는 메인 DOMContentLoaded에서 호출됨
+// 💡 중요: 페이지 로드 및 데이터 수신 시 드롭다운 함수 강제 실행
+document.addEventListener('DOMContentLoaded', () => {
+    updateDatalistFromSheet();
+});
 
 // 구글 시트 데이터가 로드된 후에도 리스트를 갱신하도록 추가
 const originalInitSheetData = window.initSheetData;
@@ -1564,7 +1536,7 @@ function loadDraftFromFile(file) {
             setVal('projMemo',       p.memo);
 
             // 2. 제작물 리스트 복원
-            const tb = document.querySelector('#item-tbody');
+            const tb = document.querySelector('#item-tbody') || document.querySelector('#listTable tbody');
             if (tb) {
                 // 기존 행 전부 제거
                 while (tb.firstChild) tb.removeChild(tb.firstChild);
@@ -1634,105 +1606,29 @@ function loadDraftFromFile(file) {
     reader.readAsText(file, 'UTF-8');
 }
 
+// ── 버튼 이벤트 바인딩 ──
+document.addEventListener('DOMContentLoaded', () => {
+    // 임시 저장 버튼
+    const saveDraftBtn = document.getElementById('saveDraft');
+    if (saveDraftBtn) {
+        saveDraftBtn.addEventListener('click', saveDraftToFile);
+    }
 
-// =====================================================
-// [엑셀 불러오기] - 저장된 .xlsx를 역파싱해서 폼 복원
-// 엑셀 구조: R0=제목, R1~R3=프로젝트정보, R4=빈행, R5=헤더, R6~=데이터
-// =====================================================
-function importFromXLSX(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const wb   = XLSX.read(data, { type: 'array', cellText: false, cellDates: true });
-            const ws   = wb.Sheets[wb.SheetNames[0]];
-
-            // 셀값 안전하게 읽기
-            const cell = (r, c) => {
-                const ref = XLSX.utils.encode_cell({ r, c });
-                const cel = ws[ref];
-                if (!cel) return '';
-                if (cel.t === 'd') return cel.v instanceof Date ? cel.v.toISOString().slice(0,10) : String(cel.v);
-                return cel.v !== undefined && cel.v !== null ? String(cel.v) : '';
-            };
-
-            // 파일 유효성 검사
-            if (!cell(0, 0).includes('제작물')) {
-                alert('올바르지 않은 파일입니다.\n이 도구에서 내보낸 엑셀 파일만 불러올 수 있습니다.');
-                return;
+    // 불러오기 버튼 → 숨겨진 file input 트리거
+    const loadDraftBtn  = document.getElementById('loadDraft');
+    const loadDraftFile = document.getElementById('loadDraftFile');
+    if (loadDraftBtn && loadDraftFile) {
+        loadDraftBtn.addEventListener('click', () => loadDraftFile.click());
+        loadDraftFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadDraftFromFile(file);
+                // input 초기화 (같은 파일 재선택 가능하도록)
+                e.target.value = '';
             }
-
-            // 프로젝트 정보 복원
-            const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-            setVal('projName',       cell(1, 1));
-            setVal('projDate',       cell(1, 4));
-            setVal('projPlace',      cell(2, 1));
-            setVal('projPM',         cell(2, 4));
-            setVal('projMemo',       cell(3, 1));
-            setVal('projCreateDate', cell(3, 4));
-            setVal('projOrg', '');
-
-            // 헤더 행 자동 탐색 (R5 고정이지만 유연하게)
-            let dataStartRow = 6;
-            for (let r = 3; r <= 8; r++) {
-                if (cell(r, 0) === '품명') { dataStartRow = r + 1; break; }
-            }
-
-            // 제작물 리스트 복원
-            const tb = document.querySelector('#item-tbody');
-            if (!tb) { alert('제작물 테이블을 찾을 수 없습니다.'); return; }
-            while (tb.firstChild) tb.removeChild(tb.firstChild);
-
-            const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-            let importedCount = 0;
-            for (let r = dataStartRow; r <= range.e.r; r++) {
-                const item    = cell(r, 0);
-                const size    = cell(r, 1);
-                const qty     = cell(r, 2);
-                const mat     = cell(r, 3);
-                const vendor  = cell(r, 4);
-                const contact = cell(r, 5);
-                const memo    = cell(r, 6);
-                const consult = cell(r, 7);
-                if (!item && !size && !vendor) continue;
-                addRow({ item, size, qty: qty || '1', mat, vendor, contact, memo, isConsult: false });
-                if (consult === 'Y') {
-                    const lastRow = tb.lastElementChild;
-                    if (lastRow) {
-                        const chk = lastRow.querySelector('[data-role="isConsult"]');
-                        if (chk) { chk.checked = true; toggleConsulting(chk); }
-                    }
-                }
-                importedCount++;
-            }
-            if (tb.children.length === 0) addRow({});
-            checkInputs();
-
-            // 완료 피드백
-            const btn = document.getElementById('importXLSX');
-            if (btn) {
-                const orig = btn.textContent;
-                btn.textContent = '✅ 불러옴!';
-                btn.disabled = true;
-                setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
-            }
-            const status = document.getElementById('status');
-            if (status) {
-                const prev = status.textContent;
-                const prevColor = status.style.color;
-                status.textContent = '📋 엑셀 불러오기 완료 — ' + importedCount + '개 항목 복원됨';
-                status.style.color = '#217346';
-                setTimeout(() => { status.textContent = prev; status.style.color = prevColor; }, 5000);
-            }
-        } catch (err) {
-            alert('엑셀 파일을 읽는 중 오류가 발생했습니다.\n\n상세: ' + err.message);
-            console.error(err);
-        }
-    };
-    reader.onerror = () => alert('파일을 읽을 수 없습니다. 다시 시도해주세요.');
-    reader.readAsArrayBuffer(file);
-}
+        });
+    }
+});
 </script>
 </body>
 </html>

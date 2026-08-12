@@ -363,7 +363,7 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
   <div class="header">
     <div>
       <h1>제작물 자동화 리스트 v1.02</h1>
-      <div class="sub">필수 항목(*) 누락 시 Excel 다운로드 불가 · 2026.08.04 - 임시저장, 불러오기, 다운받은 엑셀 불러오기 기능 추가, 제작물 예시 이미지 추가 작업중.</div>
+      <div class="sub">필수 항목(*) 누락 시 Excel 다운로드 불가 · 2026.08.12 - 엑셀 불러오기, PPT 불러오기 기능 추가, 제작물 예시 이미지 추가 작업중.</div>
     </div>
   </div>
 <!-- ===== 프로젝트 정보 패널 (제작물 테이블 위 고정) ===== -->
@@ -473,8 +473,10 @@ input.invalid { border: 2px solid #ff4d4d !important; background-color: #fff5f5 
   <button id="saveDraft" class="btn" style="background:#53dd5a;">💾 임시 저장</button>
   <button id="loadDraft" class="btn" style="background:#4a90d9; color:#fff;">📂 불러오기</button>
   <button id="importXLSX" class="btn" style="background:#217346; color:#fff;">📋 엑셀 불러오기</button>
+  <button id="importPPT" class="btn" style="background:#c55a11; color:#fff;">📊 PPT 불러오기</button>
   <input type="file" id="loadDraftFile" accept=".jbak" style="display:none;">
   <input type="file" id="importXLSXFile" accept=".xlsx,.xls" style="display:none;">
+  <input type="file" id="importPPTFile" accept=".pptx" style="display:none;">
 </button>
 
         <div id="status" class="status">필수 항목(*)을 입력하면 다운로드가 활성화됩니다.</div>
@@ -942,10 +944,13 @@ document.getElementById("exportPPT").onclick = () => {
     const lineW = 9.0; 
     const centerX = (10 - lineW) / 2; 
 
-    const item = tr.querySelector('[data-role="item"]').value;
-    const size = tr.querySelector('[data-role="size"]').value;
-    const qty = tr.querySelector('[data-role="qty"]').value;
-    const mat = tr.querySelector('[data-role="mat"]').value;
+    const item    = tr.querySelector('[data-role="item"]').value;
+    const size    = tr.querySelector('[data-role="size"]').value;
+    const qty     = tr.querySelector('[data-role="qty"]').value;
+    const mat     = tr.querySelector('[data-role="mat"]').value;
+    const vendor  = tr.querySelector('[data-role="vendor"]')?.value || '';
+    const contact = tr.querySelector('[data-role="contact"]')?.value || '';
+    const memo    = tr.querySelector('[data-role="memo"]')?.value || '';
 
     // 2. 상단 텍스트
     slide.addText(item, { x: 0.4, y: 0.3, w: '60%', fontFace: FONT_EXTRA, fontSize: 14, color: "000000", align: "left" });
@@ -956,15 +961,33 @@ document.getElementById("exportPPT").onclick = () => {
     slide.addShape("line", { x: centerX, y: lineY, w: lineW, h: 0, line: { color: "000000", width: 0.5 } });
 
     // 4. 상세 데이터 정보 (라인 시작점에 맞춰 왼쪽 정렬)
-    slide.addText(`규격: ${size}  /  수량: ${qty}  /  재질: ${mat}`, { 
-        x: centerX, 
-        y: lineY + 0.3, // 선 바로 아래 배치
-        w: lineW, 
-        align: 'left', 
-        fontFace: FONT_MEDIUM, 
-        fontSize: 11, 
-        color: "000000" 
-    });
+    // 4-1. 규격/수량/재질 + 발주업체/연락처 (Text 4 name으로 파싱 대상)
+    slide.addText(
+        `규격: ${size}  /  수량: ${qty}  /  재질: ${mat}  /  발주업체: ${vendor}  /  연락처: ${contact}`,
+        { 
+            x: centerX, 
+            y: lineY + 0.3,
+            w: lineW, 
+            align: 'left', 
+            fontFace: FONT_MEDIUM, 
+            fontSize: 10, 
+            color: "000000",
+            name: "Text 4"
+        }
+    );
+    // 4-2. 비고 (Text 6 name으로 파싱 대상)
+    if (memo) {
+        slide.addText(memo, {
+            x: centerX,
+            y: lineY + 0.55,
+            w: lineW,
+            align: 'left',
+            fontFace: FONT_MEDIUM,
+            fontSize: 9,
+            color: "888888",
+            name: "Text 6"
+        });
+    }
 
 // ---------------------------------------------------------
 // [필수 입력 검사 및 버튼 활성화 함수] - 이 위치에 넣어주세요
@@ -1737,6 +1760,171 @@ document.addEventListener('DOMContentLoaded', function() {
         importFile.addEventListener('change', function(e) {
             var file = e.target.files[0];
             if (file) { importFromXLSX(file); e.target.value = ''; }
+        });
+    }
+});
+
+// =====================================================
+// [PPT 불러오기] - 제작물 자동화에서 출력한 .pptx 역파싱
+// 슬라이드1: 행사명(Text 2) / 날짜+장소(Text 3) / 주최(Text 5)
+// 슬라이드2~: 품명(Text 0) / 규격+수량+재질+발주업체+연락처(Text 4) / 비고(Text 6)
+// =====================================================
+function importFromPPT(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var buf = e.target.result;
+        if (window.JSZip) {
+            parsePPTWithJSZip(buf);
+        } else {
+            var s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+            s.onload = function() { parsePPTWithJSZip(buf); };
+            s.onerror = function() { alert('JSZip 라이브러리를 불러올 수 없습니다. 인터넷 연결을 확인해주세요.'); };
+            document.head.appendChild(s);
+        }
+    };
+    reader.onerror = function() { alert('파일을 읽을 수 없습니다.'); };
+    reader.readAsArrayBuffer(file);
+}
+
+function parsePPTWithJSZip(arrayBuffer) {
+    JSZip.loadAsync(arrayBuffer).then(function(zip) {
+        var slideFiles = [];
+        zip.forEach(function(path, file) {
+            if (/^ppt\/slides\/slide\d+\.xml$/.test(path)) {
+                slideFiles.push({ path: path, file: file });
+            }
+        });
+        slideFiles.sort(function(a, b) {
+            return parseInt(a.path.match(/\d+/)[0]) - parseInt(b.path.match(/\d+/)[0]);
+        });
+        if (slideFiles.length === 0) { alert('유효한 PPT 파일이 아닙니다.'); return; }
+        Promise.all(slideFiles.map(function(s) {
+            return s.file.async('string').then(function(xml) { return { path: s.path, xml: xml }; });
+        })).then(function(slides) {
+            try { applyPPTData(slides); }
+            catch(err) { alert('PPT 파싱 중 오류가 발생했습니다.\n\n상세: ' + err.message); console.error(err); }
+        });
+    }).catch(function(err) {
+        alert('파일을 열 수 없습니다.\n올바른 .pptx 파일인지 확인해주세요.');
+        console.error(err);
+    });
+}
+
+function extractSlideTexts(xmlStr) {
+    var parser = new DOMParser();
+    var doc    = parser.parseFromString(xmlStr, 'application/xml');
+    var shapes = doc.querySelectorAll('sp');
+    var result = [];
+    shapes.forEach(function(sp) {
+        var cNvPr = sp.querySelector('cNvPr');
+        var name  = cNvPr ? (cNvPr.getAttribute('name') || '') : '';
+        var paras = sp.querySelectorAll('p');
+        var lines = [];
+        paras.forEach(function(p) {
+            var runs = p.querySelectorAll('t');
+            var line = '';
+            runs.forEach(function(t) { line += t.textContent; });
+            if (line.trim()) lines.push(line.trim());
+        });
+        if (lines.length > 0) result.push({ name: name, text: lines.join('\n') });
+    });
+    return result;
+}
+
+function applyPPTData(slides) {
+    var slide1Texts = extractSlideTexts(slides[0].xml);
+    var hasTitle = slide1Texts.some(function(s) { return s.name === 'Text 2' || s.name === 'Text 4'; });
+    if (!hasTitle) {
+        alert('이 파일은 제작물 자동화 도구에서 출력한 PPT 파일만 불러올 수 있습니다.');
+        return;
+    }
+
+    // 슬라이드 1: 프로젝트 정보 복원
+    var getS1 = function(name) {
+        var s = slide1Texts.find(function(x) { return x.name === name; });
+        return s ? s.text.replace(/\s+/g, ' ').trim() : '';
+    };
+    var rawDatePlace = getS1('Text 3');
+    var dpParts  = rawDatePlace.split(',');
+    var projDate  = dpParts.length > 0 ? dpParts[0].trim() : '';
+    var projPlace = dpParts.length > 1 ? dpParts[dpParts.length - 1].trim() : '';
+
+    var setVal = function(id, val) { var el = document.getElementById(id); if (el) el.value = val || ''; };
+    setVal('projName',  getS1('Text 2'));
+    setVal('projDate',  projDate);
+    setVal('projPlace', projPlace);
+    setVal('projOrg',   getS1('Text 5'));
+
+    // 슬라이드 2~: 제작물 복원
+    var tb = document.querySelector('#item-tbody') || document.querySelector('#listTable tbody');
+    if (!tb) { alert('제작물 테이블을 찾을 수 없습니다.'); return; }
+    while (tb.firstChild) tb.removeChild(tb.firstChild);
+
+    var importedCount = 0;
+    for (var i = 1; i < slides.length; i++) {
+        var slideTexts = extractSlideTexts(slides[i].xml);
+        var getT = function(name) {
+            var s = slideTexts.find(function(x) { return x.name === name; });
+            return s ? s.text.trim() : '';
+        };
+
+        var item    = getT('Text 0');
+        var spec    = getT('Text 4');
+        var memoRaw = getT('Text 6');
+        var memo    = memoRaw.replace(/\n/g, ' ').trim();
+
+        if (!item && !spec) continue;
+
+        // "규격: ○○  /  수량: ○○  /  재질: ○○  /  발주업체: ○○  /  연락처: ○○" 파싱
+        // 구분자: "  /  " (공백2+슬래시+공백2) 또는 "  /" 등 공백 포함 슬래시
+        var size = '', qty = '1', mat = '', vendor = '', contact = '';
+        var mSize    = spec.match(/규격\s*[：:]\s*(.+?)(?:\s{2,}\/|$)/);
+        var mQty     = spec.match(/수량\s*[：:]\s*(\S+)/);
+        var mMat     = spec.match(/재질\s*[：:]\s*(.+?)(?:\s{2,}\/|$)/);
+        var mVendor  = spec.match(/발주업체\s*[：:]\s*(.+?)(?:\s{2,}\/|$)/);
+        var mContact = spec.match(/연락처\s*[：:]\s*(.+?)(?:\s{2,}\/|$)/);
+        if (mSize)    size    = mSize[1].trim();
+        if (mQty)     qty     = mQty[1].trim();
+        if (mMat)     mat     = mMat[1].trim();
+        if (mVendor)  vendor  = mVendor[1].trim();
+        if (mContact) contact = mContact[1].trim();
+
+        addRow({ item: item, size: size, qty: qty, mat: mat,
+                 vendor: vendor, contact: contact, memo: memo, isConsult: false });
+        importedCount++;
+    }
+
+    if (tb.children.length === 0) addRow({});
+    checkInputs();
+
+    // 완료 피드백
+    var pptBtn = document.getElementById('importPPT');
+    if (pptBtn) {
+        var origText = pptBtn.textContent;
+        pptBtn.textContent = '\u2705 불러옴!';
+        pptBtn.disabled = true;
+        setTimeout(function() { pptBtn.textContent = origText; pptBtn.disabled = false; }, 2500);
+    }
+    var st = document.getElementById('status');
+    if (st) {
+        var prev = st.textContent, prevC = st.style.color;
+        st.textContent = '\ud83d\udcca PPT 불러오기 완료 \u2014 ' + importedCount + '개 항목 + 프로젝트 정보 복원';
+        st.style.color = '#c55a11';
+        setTimeout(function() { st.textContent = prev; st.style.color = prevC; }, 5000);
+    }
+}
+
+// PPT 불러오기 버튼 바인딩
+document.addEventListener('DOMContentLoaded', function() {
+    var pptBtn  = document.getElementById('importPPT');
+    var pptFile = document.getElementById('importPPTFile');
+    if (pptBtn && pptFile) {
+        pptBtn.addEventListener('click', function() { pptFile.click(); });
+        pptFile.addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (file) { importFromPPT(file); e.target.value = ''; }
         });
     }
 });

@@ -6,7 +6,6 @@
 <title>제작물 자동화 리스트 v1.01</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <style>
 body{font-family:system-ui;background:#f7f9fc;padding:24px;}
@@ -685,7 +684,7 @@ document.getElementById("exportXLSX").onclick = () => {
 
             [], // R4
 
-            ["품명", "사이즈", "수량", "재질", "발주업체", "연락처", "비고", "협의", "완료"] // R5
+            ["품명", "사이즈", "수량", "재질", "발주업체", "연락처", "비고", "협의"] // R5
 
         ];
 
@@ -713,7 +712,7 @@ document.getElementById("exportXLSX").onclick = () => {
 
 
 
-            data.push([item, size, qty, mat, vendor, contact, memo, consult, "미완료"]);
+            data.push([item, size, qty, mat, vendor, contact, memo, consult]);
 
         });
 
@@ -727,7 +726,7 @@ document.getElementById("exportXLSX").onclick = () => {
 
         ws['!merges'] = [
 
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }, // 제목 통합
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, // 제목 통합
 
             { s: { r: 1, c: 1 }, e: { r: 1, c: 2 } }, // 행사명 입력칸 확장
 
@@ -745,7 +744,7 @@ document.getElementById("exportXLSX").onclick = () => {
 
             { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 15 },
 
-            { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 8 }, { wch: 10 }
+            { wch: 25 }, { wch: 20 }, { wch: 30 }, { wch: 8 }
 
         ];
 
@@ -823,21 +822,6 @@ document.getElementById("exportXLSX").onclick = () => {
 
         };
 
-        // 완료 행 스타일 (회색 배경 + 회색 글자 - 조건부서식으로 취소선 추가)
-        const styleDone = {
-            fill: { fgColor: { rgb: "CCCCCC" } },
-            font: { color: { rgb: "999999" } },
-            border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-        };
-
-        // 완료 셀 (I열) 헤더 스타일
-        const styleDoneHeader = {
-            font: { bold: true, color: { rgb: "FFFFFF" } },
-            fill: { fgColor: { rgb: "555555" } },
-            alignment: { horizontal: "center" },
-            border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } }
-        };
-
 
 
         // 5. 스타일 적용 루프 수정
@@ -868,21 +852,24 @@ document.getElementById("exportXLSX").onclick = () => {
 
                
 
-                if (R === 5) {
-                    ws[cell_ref].s = (C === 8) ? styleDoneHeader : styleHeader;
-                }
-                if (R >= 6) {
-                    const isConsult = ws[XLSX.utils.encode_cell({ r: R, c: 7 })]?.v === "Y";
-                    const isDone    = ws[XLSX.utils.encode_cell({ r: R, c: 8 })]?.v === "완료";
+                if (R === 5) ws[cell_ref].s = styleHeader;
 
-                    if (isDone) {
-                        ws[cell_ref].s = styleDone;
-                    } else if (isConsult) {
+                if (R >= 6) {
+
+                    const isConsult = ws[XLSX.utils.encode_cell({ r: R, c: 7 })]?.v === "Y";
+
+                    if (isConsult) {
+
                         ws[cell_ref].s = { ...styleConsult, border: styleHeader.border };
+
                     } else {
+
                         const baseStyle = (R % 2 === 0) ? styleRowA : styleRowB;
+
                         ws[cell_ref].s = baseStyle;
+
                     }
+
                 }
 
             }
@@ -890,94 +877,8 @@ document.getElementById("exportXLSX").onclick = () => {
         }
 
         XLSX.utils.book_append_sheet(wb, ws, "제작물리스트");
-
-        // ── 조건부 서식 + 드롭다운 주입 ──
-        // XLSX.writeFile 대신 binary 버퍼로 추출 → JSZip으로 XML 직접 조작 → Blob 다운로드
-        const xlsxBinary = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' });
-
-        // binary string → ArrayBuffer
-        const buf = new ArrayBuffer(xlsxBinary.length);
-        const view = new Uint8Array(buf);
-        for (let i = 0; i < xlsxBinary.length; i++) view[i] = xlsxBinary.charCodeAt(i) & 0xFF;
-
-        // JSZip으로 xlsx(ZIP) 열기
-        JSZip.loadAsync(buf).then(function(zip) {
-            // ── sheet1.xml 수정: 데이터 유효성(드롭다운) + 조건부 서식 주입 ──
-            return zip.file('xl/worksheets/sheet1.xml').async('string').then(function(sheetXml) {
-
-                // 데이터 행 수 계산 (R6~ 이므로 tbody 행 수)
-                const rowCount = tbody.querySelectorAll('tr').length;
-                const lastRow  = Math.max(rowCount + 6, 100); // 최소 100행까지 적용
-
-                // 1. 드롭다운 (데이터 유효성 검사): I7:I{lastRow} 에 완료/미완료 선택
-                const dvXml = `<dataValidations count="1">` +
-                    `<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="I7:I${lastRow}">` +
-                    `<formula1>"완료,미완료"</formula1>` +
-                    `</dataValidation>` +
-                    `</dataValidations>`;
-
-                // 2. 조건부 서식: I열이 "완료"면 A:I 전체 행 회색+취소선(dxfId=0 참조)
-                const cfXml = `<conditionalFormatting sqref="A7:I${lastRow}">` +
-                    `<cfRule type="expression" priority="1" dxfId="0" stopIfTrue="1">` +
-                    `<formula>=$I7="완료"</formula>` +
-                    `</cfRule>` +
-                    `</conditionalFormatting>`;
-
-                // </worksheet> 직전에 삽입
-                // dataValidations는 이미 없을 경우에만 삽입
-                let modified = sheetXml;
-                if (!modified.includes('<dataValidations')) {
-                    modified = modified.replace('</worksheet>', dvXml + cfXml + '</worksheet>');
-                } else {
-                    modified = modified.replace('</worksheet>', cfXml + '</worksheet>');
-                }
-                zip.file('xl/worksheets/sheet1.xml', modified);
-
-                // ── styles.xml 수정: dxf(취소선+회색배경) 추가 ──
-                return zip.file('xl/styles.xml').async('string');
-            }).then(function(stylesXml) {
-                // dxf 섹션에 취소선+회색 배경 추가
-                const dxfEntry = `<dxf><font><strike val="1"/><color rgb="FF999999"/></font>` +
-                    `<fill><patternFill patternType="solid">` +
-                    `<fgColor rgb="FFCCCCCC"/><bgColor rgb="FFCCCCCC"/>` +
-                    `</patternFill></fill></dxf>`;
-
-                let modStyles = stylesXml;
-                if (modStyles.includes('<dxfs count="0"/>')) {
-                    // dxfs가 비어있는 경우
-                    modStyles = modStyles.replace('<dxfs count="0"/>', `<dxfs count="1">${dxfEntry}</dxfs>`);
-                } else if (modStyles.includes('<dxfs count=')) {
-                    // 이미 dxf가 있는 경우: count 증가 + 앞에 추가 (priority 1이 dxfId=0)
-                    modStyles = modStyles.replace(/<dxfs count="(\d+)">/, function(m, n) {
-                        return `<dxfs count="${parseInt(n)+1}">`;
-                    });
-                    modStyles = modStyles.replace('<dxfs count="', '<dxfs count="').replace(/<dxfs count="\d+">/, function(m) {
-                        return m + dxfEntry;
-                    });
-                } else if (!modStyles.includes('<dxfs')) {
-                    // dxfs 섹션 자체가 없는 경우
-                    modStyles = modStyles.replace('</styleSheet>', `<dxfs count="1">${dxfEntry}</dxfs></styleSheet>`);
-                }
-                zip.file('xl/styles.xml', modStyles);
-
-                // ── 최종 Blob 생성 후 다운로드 ──
-                return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            }).then(function(blob) {
-                const url = URL.createObjectURL(blob);
-                const a   = document.createElement('a');
-                a.href     = url;
-                a.download = `${finalFileName}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-                console.log("✅ 엑셀 다운로드 성공 (조건부 서식 포함)");
-            });
-        }).catch(function(err) {
-            console.error("❌ JSZip 처리 오류:", err);
-            // fallback: JSZip 없으면 기존 방식으로 다운로드
-            XLSX.writeFile(wb, `${finalFileName}.xlsx`);
-        });
+        XLSX.writeFile(wb, `${finalFileName}.xlsx`);
+        console.log("✅ 엑셀 다운로드 성공 (작성일 포함)");
 
     } catch (error) {
         console.error("❌ 엑셀 다운로드 중 오류 발생:", error);
